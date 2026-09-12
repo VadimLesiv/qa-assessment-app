@@ -1,0 +1,33 @@
+node_modules/
+dist/
+build/
+.vite/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+apps/api/prisma/dev.db*
+
+# Uploaded presentations
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep
+
+# Test output
+playwright-report/
+test-results/
+coverage/
+allure-results/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

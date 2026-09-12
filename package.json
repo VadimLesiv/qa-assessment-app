@@ -1,0 +1,35 @@
+{
+  "name": "qa-assessment-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gamified study platform for QA theory, assessment prep and hands-on practice.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace @qa/api",
+    "dev:web": "npm run dev --workspace @qa/web",
+    "build": "npm run build --workspace @qa/shared && npm run build --workspace @qa/api && npm run build --workspace @qa/web",
+    "db:push": "npm run db:push --workspace @qa/api",
+    "db:seed": "npm run db:seed --workspace @qa/api",
+    "db:reset": "npm run db:reset --workspace @qa/api",
+    "test": "npm run test --workspace @qa/api",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.2",
+    "concurrently": "^9.1.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.4.3"
+  },
+  "overrides": {
+    "vite": "^6.4.3"
+  }
+}

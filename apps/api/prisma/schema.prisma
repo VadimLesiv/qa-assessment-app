@@ -1,0 +1,143 @@
+// QA Assessment App - data model
+//
+// SQLite has no native array or enum type, so list-valued fields (card bullets,
+// quiz options) are stored as JSON strings and parsed in the serializer layer.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Section {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  /// "PROCESS" | "TECHNICAL"
+  track       String
+  icon        String?
+  accent      String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subSections SubSection[]
+
+  @@index([track, order])
+}
+
+model SubSection {
+  id          String   @id @default(cuid())
+  sectionId   String
+  name        String
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  section   Section        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  cards     Card[]
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([sectionId, order])
+}
+
+model Card {
+  id           String   @id @default(cuid())
+  subSectionId String
+  front        String
+  back         String
+  notes        String?
+  /// JSON-encoded string[] of bullet points.
+  bullets      String   @default("[]")
+  sourceSlide  Int?
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subSection SubSection     @relation(fields: [subSectionId], references: [id], onDelete: Cascade)
+  progress   CardProgress[]
+
+  @@index([subSectionId, order])
+}
+
+model QuizQuestion {
+  id           String   @id @default(cuid())
+  subSectionId String
+  prompt       String
+  /// JSON-encoded string[] of answer options.
+  options      String
+  correctIndex Int
+  explanation  String?
+  /// "EASY" | "MEDIUM" | "HARD"
+  difficulty   String   @default("MEDIUM")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subSection SubSection @relation(fields: [subSectionId], references: [id], onDelete: Cascade)
+
+  @@index([subSectionId])
+}
+
+model CardProgress {
+  id       String   @id @default(cuid())
+  playerId String
+  cardId   String
+  /// "NEW" | "LEARNING" | "KNOWN"
+  status   String   @default("NEW")
+  flips    Int      @default(0)
+  lastSeenAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, cardId])
+  @@index([playerId, status])
+}
+
+model QuizAttempt {
+  id           String   @id @default(cuid())
+  playerId     String
+  subSectionId String
+  score        Int
+  total        Int
+  xpEarned     Int
+  stars        Int
+  durationMs   Int
+  createdAt    DateTime @default(now())
+
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  subSection SubSection @relation(fields: [subSectionId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, createdAt])
+}
+
+model Player {
+  id           String   @id @default(cuid())
+  name         String
+  xp           Int      @default(0)
+  streakDays   Int      @default(0)
+  lastActiveAt DateTime?
+  createdAt    DateTime @default(now())
+
+  progress CardProgress[]
+  attempts QuizAttempt[]
+  badges   EarnedBadge[]
+}
+
+model EarnedBadge {
+  id       String   @id @default(cuid())
+  playerId String
+  /// Stable identifier from the badge catalogue, e.g. "FIRST_DECK".
+  code     String
+  earnedAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, code])
+}
