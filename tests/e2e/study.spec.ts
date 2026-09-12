@@ -71,18 +71,60 @@ test.describe('studying a deck', () => {
     await expect(page.locator('.flashcard')).toHaveClass(/is-flipped/);
   });
 
-  test('marking a card as known awards XP and advances the deck', async ({ page }) => {
+  test('marking a card as known records it and advances the deck', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: /Test Design Techniques/ }).click();
     await page.getByRole('button', { name: 'Study' }).first().click();
 
-    const counterBefore = await page.locator('.deck-counter').textContent();
+    await expect(page.locator('.deck-counter')).toContainText('1 /');
 
     await page.getByRole('button', { name: '✓ I know this' }).click();
 
-    // A toast confirms the reward, and the deck moves on.
-    await expect(page.locator('.toast')).toBeVisible();
-    await expect(page.locator('.deck-counter')).not.toHaveText(counterBefore ?? '');
+    // The deck moves on, and card 1's dot turns green.
+    //
+    // XP is deliberately not asserted here: the progress endpoint is
+    // idempotent, so a card already mastered by an earlier run earns 0 XP and
+    // shows no toast. Mastery state is the durable outcome worth checking.
+    await expect(page.locator('.deck-counter')).toContainText('2 /');
+    await expect(page.locator('.deck-dot').first()).toHaveClass(/is-known/);
+  });
+
+  test('awards XP the first time a freshly created card is mastered', async ({ page }) => {
+    // A brand new deck guarantees unmastered cards, so the reward path is
+    // exercised deterministically regardless of previous runs.
+    const name = `XP Probe ${Date.now()}`;
+
+    await page.goto('/manage');
+    await page.getByRole('button', { name: '＋ New section' }).click();
+    await page.getByPlaceholder('e.g. Test Design Techniques').fill(name);
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    const section = page.locator('.panel').filter({ hasText: name });
+    await section.getByRole('button', { name: '＋ Deck' }).click();
+    await page.getByPlaceholder('e.g. Boundary Value Analysis').fill('Probe Deck');
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    await section.getByRole('button', { name: 'Cards' }).click();
+    await page.getByRole('button', { name: '＋ Add card' }).click();
+    await page.getByPlaceholder('What is boundary value analysis?').fill('Probe question?');
+    await page.getByPlaceholder(/Testing at the edges/).fill('Probe answer.');
+    await page.getByRole('button', { name: 'Save card' }).click();
+    await expect(page.getByText('Probe question?')).toBeVisible();
+
+    // Studying is reached from the dashboard, not the Manage page.
+    await page.goto('/');
+    await page.getByRole('button', { name: new RegExp(name) }).click();
+    await page.getByRole('button', { name: 'Study' }).first().click();
+
+    await page.locator('.flashcard').click();
+    await page.getByRole('button', { name: '✓ I know this' }).click();
+
+    // 5 XP for the first flip + 15 for mastering it.
+    await expect(page.locator('.toast').filter({ hasText: '+20 XP' })).toBeVisible();
+
+    await page.goto('/manage');
+    await page.locator('.panel').filter({ hasText: name }).getByRole('button', { name: '🗑' }).first().click();
+    await page.getByRole('button', { name: 'Delete' }).click();
   });
 
   test('shows a status dot for every card in the deck', async ({ page }) => {
