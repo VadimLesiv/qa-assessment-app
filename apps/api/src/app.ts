@@ -6,6 +6,8 @@ import { nestedSubSectionsRouter, subSectionsRouter } from './routes/subsections
 import { cardsRouter } from './routes/cards.js';
 import { questionsRouter, quizRouter } from './routes/quiz.js';
 import { profileRouter } from './routes/profile.js';
+import { authRouter } from './routes/auth.js';
+import { leaderboardRouter } from './routes/leaderboard.js';
 
 /**
  * Built as a factory so tests can mount the app with supertest without binding
@@ -17,8 +19,7 @@ export function createApp() {
   app.use(
     cors({
       origin: process.env.WEB_ORIGIN?.split(',') ?? ['http://localhost:5173'],
-      // The client identifies itself with this header rather than a cookie.
-      allowedHeaders: ['Content-Type', 'x-player-id'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     }),
   );
   app.use(express.json({ limit: '1mb' }));
@@ -27,6 +28,8 @@ export function createApp() {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
 
+  app.use('/api/auth', authRouter);
+  app.use('/api/leaderboard', leaderboardRouter);
   // Order matters: the nested router owns /api/sections/:id/subsections.
   app.use('/api/sections', nestedSubSectionsRouter);
   app.use('/api/sections', sectionsRouter);

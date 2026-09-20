@@ -94,6 +94,8 @@ a {
 
 button {
   font-family: inherit;
+  /* Buttons default to the UA's black `buttontext`; opt them into our palette. */
+  color: inherit;
 }
 
 /* Visible focus for keyboard users on every interactive surface. */
@@ -315,7 +317,7 @@ button {
   gap: 14px;
   padding: 20px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  background: linear-gradient(160deg, var(--bg-2), #4040ff);
   border: 1px solid var(--surface-border);
   overflow: hidden;
   cursor: pointer;
@@ -365,6 +367,8 @@ button {
 .tile-name {
   font-size: 18px;
   font-weight: 700;
+  /* Matches .deck-row-name so section and deck titles read as one family. */
+  color: var(--cyan);
 }
 
 .tile-desc {
@@ -392,6 +396,8 @@ button {
   border-radius: var(--radius);
   background: var(--bg-2);
   border: 1px solid var(--surface-border);
+  /* Set explicitly so the row never inherits a dark colour from a parent. */
+  color: var(--text-1);
   transition: transform 0.16s var(--ease-bounce), border-color 0.16s, background 0.16s;
 }
 
@@ -409,10 +415,12 @@ button {
 .deck-row-name {
   font-weight: 700;
   font-size: 16px;
+  /* Cyan reads as a "this is the deck" label and clears AA on --bg-2/--bg-3. */
+  color: var(--cyan);
 }
 
 .deck-row-meta {
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 13px;
   margin-top: 3px;
 }
@@ -467,9 +475,11 @@ button {
 .difficulty-EASY {
   color: var(--emerald);
 }
+
 .difficulty-MEDIUM {
   color: var(--amber);
 }
+
 .difficulty-HARD {
   color: var(--rose);
 }
@@ -1042,6 +1052,71 @@ button {
 }
 
 /* ========================================================================== */
+/* Drag & drop reordering (Manage page)                                       */
+/* ========================================================================== */
+
+/* Only the handle starts a drag, so the rest of the row stays clickable. */
+.drag-handle {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  transition: color 0.16s, background 0.16s;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  color: var(--text-1);
+  background: var(--bg-3);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.sortable {
+  position: relative;
+}
+
+/* The row being carried stays visible but clearly "lifted out" of the list. */
+.sortable.is-dragging {
+  opacity: 0.45;
+}
+
+/* Insertion line. Drawn as an overlay so the list never shifts under the pointer. */
+.sortable.is-drop-before::after,
+.sortable.is-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--accent-bright);
+  box-shadow: 0 0 10px var(--accent-bright);
+  pointer-events: none;
+}
+
+.sortable.is-drop-before::after {
+  top: -2px;
+}
+
+.sortable.is-drop-after::after {
+  bottom: -2px;
+}
+
+/* A section that a dragged deck would land in. */
+.panel.is-drop-into {
+  border-color: var(--accent-bright);
+  background: linear-gradient(160deg, var(--accent-soft), var(--bg-1));
+}
+
+/* ========================================================================== */
 /* Modal                                                                      */
 /* ========================================================================== */
 
@@ -1229,10 +1304,12 @@ button {
 }
 
 @keyframes pulse-glow {
+
   0%,
   100% {
     box-shadow: 0 0 18px rgba(168, 85, 247, 0.35);
   }
+
   50% {
     box-shadow: 0 0 34px rgba(168, 85, 247, 0.65);
   }
@@ -1279,6 +1356,7 @@ button {
 
 /* Respect users who have asked the OS to reduce motion. */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {
@@ -1290,4 +1368,117 @@ button {
   .flashcard {
     transition: none;
   }
+}
+
+/* ========================================================================== */
+/* Auth pages                                                                 */
+/* ========================================================================== */
+
+.auth-page {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 64px);
+  max-width: none;
+}
+
+.auth-panel {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.auth-error {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(251, 113, 133, 0.12);
+  border: 1px solid rgba(251, 113, 133, 0.34);
+  color: #ffc2cb;
+  font-size: 13px;
+  margin: 0;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+  margin: 0;
+}
+
+.auth-switch a {
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+/* ========================================================================== */
+/* Leaderboard                                                               */
+/* ========================================================================== */
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 20px;
+}
+
+.leaderboard-row.is-you {
+  border-color: rgba(168, 85, 247, 0.5);
+  background: linear-gradient(160deg, var(--accent-soft), var(--bg-1));
+}
+
+.leaderboard-rank {
+  flex-shrink: 0;
+  width: 40px;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.leaderboard-you-tag {
+  color: var(--accent-bright);
+  font-weight: 700;
+}
+
+.leaderboard-streak {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.leaderboard-xp {
+  flex-shrink: 0;
+  min-width: 90px;
+  text-align: right;
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
 }

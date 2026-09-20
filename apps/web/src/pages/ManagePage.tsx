@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { DragEvent, KeyboardEvent } from 'react';
 import type { Card, ImportPreview, Section, SectionTrack, SubSection } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { plural } from '../lib/format';
+import { moveDeck, moveSection } from '../lib/reorder';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Empty, ErrorBanner, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
@@ -9,6 +11,14 @@ import { useToast } from '../components/Toast';
 type SectionDraft = { id?: string; name: string; track: SectionTrack; description: string; icon: string; accent: string };
 type DeckDraft = { id?: string; sectionId: string; name: string; description: string };
 type CardDraft = { id?: string; front: string; back: string; bullets: string; notes: string };
+
+/** What the user picked up. Decks remember their origin so a move can be named. */
+type Drag = { kind: 'section'; id: string } | { kind: 'deck'; id: string; sectionId: string };
+
+/** Where it would land: an insertion slot in the section list or in a deck list. */
+type DropHint =
+  | { kind: 'section'; index: number }
+  | { kind: 'deck'; sectionId: string; index: number };
 
 const ACCENTS = ['#7c3aed', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', '#f472b6', '#60a5fa'];
 const ICONS = ['📘', '🧭', '📋', '🔄', '🎯', '🤖', '🔌', '🧪', '🧠', '🚀', '🛡️', '⚙️'];
@@ -34,6 +44,9 @@ export function ManagePage() {
   /** The deck whose cards are currently open in the editor panel. */
   const [openDeck, setOpenDeck] = useState<{ deck: SubSection; cards: Card[] } | null>(null);
   const [importTarget, setImportTarget] = useState<SubSection | null>(null);
+
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [hint, setHint] = useState<DropHint | null>(null);
 
   const toast = useToast();
 
@@ -68,6 +81,126 @@ export function ManagePage() {
     setOpenDeck((current) => (current && current.deck.id === deckId ? { ...current, cards } : current));
   };
 
+  /* ---------------------------------------------------------------- */
+  /* Drag & drop reordering                                            */
+  /* ---------------------------------------------------------------- */
+
+  const clearDrag = () => {
+    setDrag(null);
+    setHint(null);
+  };
+
+  /**
+   * Paints the new order straight away and rolls back if the server rejects it,
+   * so a drag never leaves the list looking like it snapped back for no reason.
+   */
+  const commitOrder = async (next: Section[], save: () => Promise<void>, message: string) => {
+    const previous = sections;
+    setSections(next);
+    try {
+      await save();
+      toast.info(message);
+    } catch (err) {
+      setSections(previous);
+      toast.error(err instanceof ApiRequestError ? err.fieldSummary : 'The new order could not be saved');
+    }
+  };
+
+  const applySectionMove = (sectionId: string, insertAt: number) => {
+    if (!sections) return;
+    const move = moveSection(sections, sectionId, insertAt);
+    if (move) void commitOrder(move.sections, () => api.reorderSections(move.ids), 'Section order saved');
+  };
+
+  const applyDeckMove = (deckId: string, fromSectionId: string, toSectionId: string, insertAt: number) => {
+    if (!sections) return;
+    const move = moveDeck(sections, deckId, toSectionId, insertAt);
+    if (!move) return;
+    void commitOrder(
+      move.sections,
+      () => api.reorderSubSections(move.groups),
+      fromSectionId === toSectionId ? 'Deck order saved' : 'Deck moved to another section',
+    );
+  };
+
+  const startDrag = (event: DragEvent<HTMLElement>, next: Drag) => {
+    event.dataTransfer.effectAllowed = 'move';
+    // Firefox will not start a drag unless the payload carries something.
+    event.dataTransfer.setData('text/plain', next.id);
+    // Drag the whole row rather than the little handle that was grabbed.
+    const root = event.currentTarget.closest<HTMLElement>('[data-drag-root]');
+    if (root) event.dataTransfer.setDragImage(root, 24, 24);
+    setDrag(next);
+  };
+
+  /** Which half of the hovered row the pointer is in decides before vs. after. */
+  const insertIndexFor = (event: DragEvent<HTMLElement>, index: number) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    return event.clientY < box.top + box.height / 2 ? index : index + 1;
+  };
+
+  /** Anywhere on a section: reorders sections, or appends a dragged deck to it. */
+  const onSectionDragOver = (event: DragEvent<HTMLElement>, section: Section, index: number) => {
+    if (!drag) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (drag.kind === 'section') setHint({ kind: 'section', index: insertIndexFor(event, index) });
+    else setHint({ kind: 'deck', sectionId: section.id, index: (section.subSections ?? []).length });
+  };
+
+  /** A deck row is a finer target than its section, so it stops the bubble. */
+  const onDeckDragOver = (event: DragEvent<HTMLElement>, sectionId: string, index: number) => {
+    if (drag?.kind !== 'deck') return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+    setHint({ kind: 'deck', sectionId, index: insertIndexFor(event, index) });
+  };
+
+  const onDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (drag?.kind === 'section' && hint?.kind === 'section') applySectionMove(drag.id, hint.index);
+    else if (drag?.kind === 'deck' && hint?.kind === 'deck') {
+      applyDeckMove(drag.id, drag.sectionId, hint.sectionId, hint.index);
+    }
+    clearDrag();
+  };
+
+  /**
+   * Keyboard equivalent of a drag. Insertion slots sit between items, so moving
+   * down one place means inserting two slots along.
+   */
+  const nudgeSection = (sectionId: string, delta: -1 | 1) => {
+    if (!sections) return;
+    const from = sections.findIndex((s) => s.id === sectionId);
+    if (from + delta < 0 || from + delta >= sections.length) return;
+    applySectionMove(sectionId, delta === -1 ? from - 1 : from + 2);
+  };
+
+  /** Past either end of its own section, a deck spills into the neighbouring one. */
+  const nudgeDeck = (deckId: string, sectionId: string, delta: -1 | 1) => {
+    if (!sections) return;
+    const sectionIndex = sections.findIndex((s) => s.id === sectionId);
+    const decks = sections[sectionIndex]?.subSections ?? [];
+    const from = decks.findIndex((d) => d.id === deckId);
+    const to = from + delta;
+
+    if (to >= 0 && to < decks.length) {
+      applyDeckMove(deckId, sectionId, sectionId, delta === -1 ? from - 1 : from + 2);
+      return;
+    }
+
+    const neighbour = sections[sectionIndex + delta];
+    if (!neighbour) return;
+    applyDeckMove(deckId, sectionId, neighbour.id, delta === -1 ? (neighbour.subSections ?? []).length : 0);
+  };
+
+  const onHandleKeyDown = (event: KeyboardEvent<HTMLElement>, move: (delta: -1 | 1) => void) => {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    move(event.key === 'ArrowUp' ? -1 : 1);
+  };
+
   if (error) {
     return (
       <main className="page">
@@ -85,7 +218,8 @@ export function ManagePage() {
           <h1 className="page-title">Manage content</h1>
           <p className="page-subtitle">
             Build your own curriculum: create sections and decks, write flashcards by hand, or import an
-            existing PowerPoint presentation and turn every slide into a card.
+            existing PowerPoint presentation and turn every slide into a card. Drag the ⠿ handles to
+            reorder sections and decks, or to move a deck into another section.
           </p>
         </div>
         <button type="button" className="btn btn--primary" onClick={() => setSectionDraft(emptySection())}>
@@ -100,10 +234,41 @@ export function ManagePage() {
           </button>
         </Empty>
       ) : (
-        <div className="stack" style={{ gap: 20 }}>
-          {sections.map((section) => (
-            <div key={section.id} className="panel">
+        <div
+          className="stack"
+          style={{ gap: 20 }}
+          // Keeps the gaps between panels droppable: the last hint still stands,
+          // so a release there lands where the drop line says it will.
+          onDragOver={(e) => drag && e.preventDefault()}
+          onDrop={onDrop}
+        >
+          {sections.map((section, sectionIndex) => (
+            <div
+              key={section.id}
+              data-drag-root
+              data-section-name={section.name}
+              className={[
+                'panel',
+                'sortable',
+                drag?.kind === 'section' && drag.id === section.id ? 'is-dragging' : '',
+                hint?.kind === 'section' && hint.index === sectionIndex ? 'is-drop-before' : '',
+                hint?.kind === 'section' && hint.index === sections.length && sectionIndex === sections.length - 1
+                  ? 'is-drop-after'
+                  : '',
+                hint?.kind === 'deck' && hint.sectionId === section.id ? 'is-drop-into' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onDragOver={(e) => onSectionDragOver(e, section, sectionIndex)}
+              onDragEnd={clearDrag}
+            >
               <div className="row" style={{ alignItems: 'flex-start' }}>
+                <DragHandle
+                  label={`Reorder section ${section.name}`}
+                  onDragStart={(e) => startDrag(e, { kind: 'section', id: section.id })}
+                  onDragEnd={clearDrag}
+                  onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeSection(section.id, delta))}
+                />
                 <span className="tile-icon" aria-hidden="true">
                   {section.icon ?? '📘'}
                 </span>
@@ -162,10 +327,39 @@ export function ManagePage() {
 
               <div className="stack" style={{ marginTop: 16, gap: 9 }}>
                 {(section.subSections ?? []).length === 0 ? (
-                  <p className="field-hint">No decks in this section yet.</p>
+                  <p className="field-hint">No decks in this section yet — drop one here to move it in.</p>
                 ) : (
-                  section.subSections!.map((deck) => (
-                    <div key={deck.id} className="deck-row" style={{ padding: '12px 15px' }}>
+                  section.subSections!.map((deck, deckIndex) => (
+                    <div
+                      key={deck.id}
+                      data-drag-root
+                      data-deck-name={deck.name}
+                      className={[
+                        'deck-row',
+                        'sortable',
+                        drag?.kind === 'deck' && drag.id === deck.id ? 'is-dragging' : '',
+                        hint?.kind === 'deck' && hint.sectionId === section.id && hint.index === deckIndex
+                          ? 'is-drop-before'
+                          : '',
+                        hint?.kind === 'deck' &&
+                        hint.sectionId === section.id &&
+                        hint.index === section.subSections!.length &&
+                        deckIndex === section.subSections!.length - 1
+                          ? 'is-drop-after'
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      style={{ padding: '12px 15px' }}
+                      onDragOver={(e) => onDeckDragOver(e, section.id, deckIndex)}
+                      onDragEnd={clearDrag}
+                    >
+                      <DragHandle
+                        label={`Reorder deck ${deck.name}`}
+                        onDragStart={(e) => startDrag(e, { kind: 'deck', id: deck.id, sectionId: section.id })}
+                        onDragEnd={clearDrag}
+                        onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeDeck(deck.id, section.id, delta))}
+                      />
                       <div className="deck-row-body">
                         <div className="deck-row-name" style={{ fontSize: 15 }}>
                           {deck.name}
@@ -494,6 +688,42 @@ export function ManagePage() {
         />
       )}
     </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Drag handle                                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The grab point of a row. Only the handle is draggable, so the buttons and
+ * text alongside it keep working normally; arrow keys are the no-mouse route.
+ */
+function DragHandle({
+  label,
+  onDragStart,
+  onDragEnd,
+  onKeyDown,
+}: {
+  label: string;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+  onDragEnd: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+}) {
+  return (
+    <span
+      className="drag-handle"
+      role="button"
+      tabIndex={0}
+      draggable
+      aria-label={label}
+      title="Drag to move — or focus and press ↑ / ↓"
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onKeyDown={onKeyDown}
+    >
+      ⠿
+    </span>
   );
 }
 

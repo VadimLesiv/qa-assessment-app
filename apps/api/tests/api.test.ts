@@ -6,14 +6,26 @@ import { buildPptx } from './helpers/pptx.js';
 
 const app = createApp();
 
+let token: string;
+
+/** Every route that touches player state now requires a bearer token. */
+function api() {
+  return {
+    get: (url: string) => request(app).get(url).set('Authorization', `Bearer ${token}`),
+    post: (url: string) => request(app).post(url).set('Authorization', `Bearer ${token}`),
+    put: (url: string) => request(app).put(url).set('Authorization', `Bearer ${token}`),
+    delete: (url: string) => request(app).delete(url).set('Authorization', `Bearer ${token}`),
+  };
+}
+
 /** Creates a section + deck and returns both ids, for tests that need a target. */
 async function makeDeck(name = 'Test Deck') {
-  const section = await request(app)
+  const section = await api()
     .post('/api/sections')
     .send({ name: `Section ${Math.random().toString(36).slice(2, 8)}`, track: 'TECHNICAL' })
     .expect(201);
 
-  const deck = await request(app)
+  const deck = await api()
     .post(`/api/sections/${section.body.data.id}/subsections`)
     .send({ name })
     .expect(201);
@@ -21,12 +33,24 @@ async function makeDeck(name = 'Test Deck') {
   return { sectionId: section.body.data.id as string, deckId: deck.body.data.id as string };
 }
 
+/** Adds one more deck to an existing section and returns its id. */
+async function addDeck(sectionId: string, name: string) {
+  const deck = await api().post(`/api/sections/${sectionId}/subsections`).send({ name }).expect(201);
+  return deck.body.data.id as string;
+}
+
 beforeEach(async () => {
   // Deleting sections cascades to decks, cards, questions and progress.
   await prisma.section.deleteMany();
   await prisma.quizAttempt.deleteMany();
   await prisma.earnedBadge.deleteMany();
-  await prisma.player.updateMany({ data: { xp: 0, streakDays: 0, lastActiveAt: null } });
+  await prisma.player.deleteMany();
+
+  const registered = await request(app)
+    .post('/api/auth/register')
+    .send({ name: 'Tester', email: `tester-${Math.random().toString(36).slice(2)}@example.com`, password: 'password123' })
+    .expect(201);
+  token = registered.body.data.token;
 });
 
 describe('GET /api/health', () => {
@@ -38,11 +62,11 @@ describe('GET /api/health', () => {
 
 describe('sections', () => {
   it('creates a section and derives a unique slug', async () => {
-    const first = await request(app)
+    const first = await api()
       .post('/api/sections')
       .send({ name: 'Test Design', track: 'TECHNICAL' })
       .expect(201);
-    const second = await request(app)
+    const second = await api()
       .post('/api/sections')
       .send({ name: 'Test Design', track: 'TECHNICAL' })
       .expect(201);
@@ -53,7 +77,7 @@ describe('sections', () => {
   });
 
   it('rejects an invalid track', async () => {
-    const response = await request(app)
+    const response = await api()
       .post('/api/sections')
       .send({ name: 'Nope', track: 'SOMETHING_ELSE' })
       .expect(400);
@@ -63,27 +87,27 @@ describe('sections', () => {
   });
 
   it('rejects a blank name', async () => {
-    const response = await request(app).post('/api/sections').send({ name: '   ', track: 'PROCESS' }).expect(400);
+    const response = await api().post('/api/sections').send({ name: '   ', track: 'PROCESS' }).expect(400);
     expect(response.body.error.details.name).toContain('Name is required');
   });
 
   it('filters the list by track', async () => {
-    await request(app).post('/api/sections').send({ name: 'P', track: 'PROCESS' }).expect(201);
-    await request(app).post('/api/sections').send({ name: 'T', track: 'TECHNICAL' }).expect(201);
+    await api().post('/api/sections').send({ name: 'P', track: 'PROCESS' }).expect(201);
+    await api().post('/api/sections').send({ name: 'T', track: 'TECHNICAL' }).expect(201);
 
-    const response = await request(app).get('/api/sections?track=PROCESS').expect(200);
+    const response = await api().get('/api/sections?track=PROCESS').expect(200);
 
     expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0].name).toBe('P');
   });
 
   it('renames a section via PUT and keeps the slug in step', async () => {
-    const created = await request(app)
+    const created = await api()
       .post('/api/sections')
       .send({ name: 'Old Name', track: 'PROCESS' })
       .expect(201);
 
-    const updated = await request(app)
+    const updated = await api()
       .put(`/api/sections/${created.body.data.id}`)
       .send({ name: 'New Name' })
       .expect(200);
@@ -93,16 +117,43 @@ describe('sections', () => {
   });
 
   it('returns 404 for a section that does not exist', async () => {
-    await request(app).get('/api/sections/does-not-exist').expect(404);
-    await request(app).put('/api/sections/does-not-exist').send({ name: 'x' }).expect(404);
-    await request(app).delete('/api/sections/does-not-exist').expect(404);
+    await api().get('/api/sections/does-not-exist').expect(404);
+    await api().put('/api/sections/does-not-exist').send({ name: 'x' }).expect(404);
+    await api().delete('/api/sections/does-not-exist').expect(404);
+  });
+
+  it('reorders sections to match the ids it is given', async () => {
+    const ids: string[] = [];
+    for (const name of ['First', 'Second', 'Third']) {
+      const created = await api().post('/api/sections').send({ name, track: 'PROCESS' }).expect(201);
+      ids.push(created.body.data.id);
+    }
+
+    // Drag the last section to the front.
+    await api()
+      .put('/api/sections/reorder')
+      .send({ ids: [ids[2], ids[0], ids[1]] })
+      .expect(204);
+
+    const listed = await api().get('/api/sections').expect(200);
+    expect(listed.body.data.map((s: { name: string }) => s.name)).toEqual(['Third', 'First', 'Second']);
+    expect(listed.body.data.map((s: { order: number }) => s.order)).toEqual([0, 1, 2]);
+  });
+
+  it('rejects a reorder naming an unknown or duplicated section', async () => {
+    const created = await api().post('/api/sections').send({ name: 'Only', track: 'PROCESS' }).expect(201);
+    const id = created.body.data.id;
+
+    await api().put('/api/sections/reorder').send({ ids: [id, 'ghost'] }).expect(400);
+    await api().put('/api/sections/reorder').send({ ids: [id, id] }).expect(400);
+    await api().put('/api/sections/reorder').send({ ids: [] }).expect(400);
   });
 
   it('cascades a delete down to cards', async () => {
     const { sectionId, deckId } = await makeDeck();
-    await request(app).post(`/api/subsections/${deckId}/cards`).send({ front: 'F', back: 'B' }).expect(201);
+    await api().post(`/api/subsections/${deckId}/cards`).send({ front: 'F', back: 'B' }).expect(201);
 
-    await request(app).delete(`/api/sections/${sectionId}`).expect(204);
+    await api().delete(`/api/sections/${sectionId}`).expect(204);
 
     expect(await prisma.subSection.count({ where: { id: deckId } })).toBe(0);
     expect(await prisma.card.count({ where: { subSectionId: deckId } })).toBe(0);
@@ -112,21 +163,21 @@ describe('sections', () => {
 describe('sub-sections', () => {
   it('creates a deck under a section', async () => {
     const { deckId } = await makeDeck('Boundary Values');
-    const response = await request(app).get(`/api/subsections/${deckId}`).expect(200);
+    const response = await api().get(`/api/subsections/${deckId}`).expect(200);
 
     expect(response.body.data.name).toBe('Boundary Values');
     expect(response.body.data.cards).toEqual([]);
   });
 
   it('refuses to create a deck under a missing section', async () => {
-    await request(app).post('/api/sections/nope/subsections').send({ name: 'Orphan' }).expect(404);
+    await api().post('/api/sections/nope/subsections').send({ name: 'Orphan' }).expect(404);
   });
 
   it('moves a deck to a different section', async () => {
     const a = await makeDeck();
     const b = await makeDeck();
 
-    const response = await request(app)
+    const response = await api()
       .put(`/api/subsections/${a.deckId}`)
       .send({ sectionId: b.sectionId })
       .expect(200);
@@ -136,7 +187,77 @@ describe('sub-sections', () => {
 
   it('rejects a move to a section that does not exist', async () => {
     const { deckId } = await makeDeck();
-    await request(app).put(`/api/subsections/${deckId}`).send({ sectionId: 'ghost' }).expect(400);
+    await api().put(`/api/subsections/${deckId}`).send({ sectionId: 'ghost' }).expect(400);
+  });
+
+  it('reorders decks inside one section', async () => {
+    const { sectionId, deckId: first } = await makeDeck('First');
+    const second = await addDeck(sectionId, 'Second');
+    const third = await addDeck(sectionId, 'Third');
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({ groups: [{ sectionId, subSectionIds: [third, first, second] }] })
+      .expect(204);
+
+    const listed = await api().get(`/api/sections/${sectionId}/subsections`).expect(200);
+    expect(listed.body.data.map((d: { name: string }) => d.name)).toEqual(['Third', 'First', 'Second']);
+    expect(listed.body.data.map((d: { order: number }) => d.order)).toEqual([0, 1, 2]);
+  });
+
+  it('moves a deck between sections and closes the gap it left', async () => {
+    const source = await makeDeck('Stays');
+    const moving = await addDeck(source.sectionId, 'Moves');
+    const target = await makeDeck('Already there');
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({
+        groups: [
+          { sectionId: source.sectionId, subSectionIds: [source.deckId] },
+          { sectionId: target.sectionId, subSectionIds: [moving, target.deckId] },
+        ],
+      })
+      .expect(204);
+
+    const left = await api().get(`/api/sections/${source.sectionId}/subsections`).expect(200);
+    expect(left.body.data.map((d: { name: string }) => d.name)).toEqual(['Stays']);
+
+    const arrived = await api().get(`/api/sections/${target.sectionId}/subsections`).expect(200);
+    expect(arrived.body.data.map((d: { name: string }) => d.name)).toEqual(['Moves', 'Already there']);
+    expect(arrived.body.data[0].sectionId).toBe(target.sectionId);
+  });
+
+  it('rejects a reorder with an unknown section, unknown deck or a repeated deck', async () => {
+    const { sectionId, deckId } = await makeDeck();
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({ groups: [{ sectionId: 'ghost', subSectionIds: [deckId] }] })
+      .expect(400);
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({ groups: [{ sectionId, subSectionIds: ['ghost'] }] })
+      .expect(400);
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({ groups: [{ sectionId, subSectionIds: [deckId, deckId] }] })
+      .expect(400);
+  });
+
+  it('leaves the order untouched when a reorder fails part way through', async () => {
+    const { sectionId, deckId: first } = await makeDeck('First');
+    const second = await addDeck(sectionId, 'Second');
+
+    await api()
+      .put('/api/subsections/reorder')
+      .send({ groups: [{ sectionId, subSectionIds: [second, first, 'ghost'] }] })
+      .expect(400);
+
+    const listed = await api().get(`/api/sections/${sectionId}/subsections`).expect(200);
+    expect(listed.body.data.map((d: { name: string }) => d.name)).toEqual(['First', 'Second']);
   });
 });
 
@@ -144,18 +265,18 @@ describe('cards', () => {
   it('supports the full GET / PUT / DELETE lifecycle', async () => {
     const { deckId } = await makeDeck();
 
-    const created = await request(app)
+    const created = await api()
       .post(`/api/subsections/${deckId}/cards`)
       .send({ front: 'What is QA?', back: 'Quality Assurance', bullets: ['one', 'two'] })
       .expect(201);
     const cardId = created.body.data.id;
     expect(created.body.data.bullets).toEqual(['one', 'two']);
 
-    const fetched = await request(app).get(`/api/cards/${cardId}`).expect(200);
+    const fetched = await api().get(`/api/cards/${cardId}`).expect(200);
     expect(fetched.body.data.front).toBe('What is QA?');
     expect(fetched.body.data.status).toBe('NEW');
 
-    const updated = await request(app)
+    const updated = await api()
       .put(`/api/cards/${cardId}`)
       .send({ front: 'What is Quality Assurance?', bullets: ['only one'] })
       .expect(200);
@@ -164,27 +285,27 @@ describe('cards', () => {
     // An untouched field must survive a partial update.
     expect(updated.body.data.back).toBe('Quality Assurance');
 
-    await request(app).delete(`/api/cards/${cardId}`).expect(204);
-    await request(app).get(`/api/cards/${cardId}`).expect(404);
+    await api().delete(`/api/cards/${cardId}`).expect(204);
+    await api().get(`/api/cards/${cardId}`).expect(404);
   });
 
   it('rejects an empty update', async () => {
     const { deckId } = await makeDeck();
-    const created = await request(app)
+    const created = await api()
       .post(`/api/subsections/${deckId}/cards`)
       .send({ front: 'F', back: 'B' })
       .expect(201);
 
-    await request(app).put(`/api/cards/${created.body.data.id}`).send({}).expect(400);
+    await api().put(`/api/cards/${created.body.data.id}`).send({}).expect(400);
   });
 
   it('keeps insertion order', async () => {
     const { deckId } = await makeDeck();
     for (const front of ['first', 'second', 'third']) {
-      await request(app).post(`/api/subsections/${deckId}/cards`).send({ front, back: 'x' }).expect(201);
+      await api().post(`/api/subsections/${deckId}/cards`).send({ front, back: 'x' }).expect(201);
     }
 
-    const response = await request(app).get(`/api/subsections/${deckId}/cards`).expect(200);
+    const response = await api().get(`/api/subsections/${deckId}/cards`).expect(200);
     expect(response.body.data.map((c: { front: string }) => c.front)).toEqual(['first', 'second', 'third']);
   });
 });
@@ -192,12 +313,12 @@ describe('cards', () => {
 describe('card progress and XP', () => {
   it('awards XP for a first flip and for mastering a card', async () => {
     const { deckId } = await makeDeck();
-    const created = await request(app)
+    const created = await api()
       .post(`/api/subsections/${deckId}/cards`)
       .send({ front: 'F', back: 'B' })
       .expect(201);
 
-    const response = await request(app)
+    const response = await api()
       .put(`/api/cards/${created.body.data.id}/progress`)
       .send({ status: 'KNOWN', flipped: true })
       .expect(200);
@@ -210,14 +331,14 @@ describe('card progress and XP', () => {
 
   it('does not award XP twice for the same card', async () => {
     const { deckId } = await makeDeck();
-    const created = await request(app)
+    const created = await api()
       .post(`/api/subsections/${deckId}/cards`)
       .send({ front: 'F', back: 'B' })
       .expect(201);
     const url = `/api/cards/${created.body.data.id}/progress`;
 
-    await request(app).put(url).send({ status: 'KNOWN', flipped: true }).expect(200);
-    const second = await request(app).put(url).send({ status: 'KNOWN', flipped: true }).expect(200);
+    await api().put(url).send({ status: 'KNOWN', flipped: true }).expect(200);
+    const second = await api().put(url).send({ status: 'KNOWN', flipped: true }).expect(200);
 
     expect(second.body.data.xpEarned).toBe(0);
   });
@@ -226,20 +347,20 @@ describe('card progress and XP', () => {
     const { deckId } = await makeDeck();
     const ids: string[] = [];
     for (const front of ['a', 'b']) {
-      const created = await request(app)
+      const created = await api()
         .post(`/api/subsections/${deckId}/cards`)
         .send({ front, back: 'x' })
         .expect(201);
       ids.push(created.body.data.id);
     }
 
-    const first = await request(app)
+    const first = await api()
       .put(`/api/cards/${ids[0]}/progress`)
       .send({ status: 'KNOWN', flipped: true })
       .expect(200);
     expect(first.body.data.newBadges.map((b: { code: string }) => b.code)).not.toContain('DECK_DONE');
 
-    const second = await request(app)
+    const second = await api()
       .put(`/api/cards/${ids[1]}/progress`)
       .send({ status: 'KNOWN', flipped: true })
       .expect(200);
@@ -248,19 +369,19 @@ describe('card progress and XP', () => {
 
   it('rejects an unknown status', async () => {
     const { deckId } = await makeDeck();
-    const created = await request(app)
+    const created = await api()
       .post(`/api/subsections/${deckId}/cards`)
       .send({ front: 'F', back: 'B' })
       .expect(201);
 
-    await request(app).put(`/api/cards/${created.body.data.id}/progress`).send({ status: 'MASTERED' }).expect(400);
+    await api().put(`/api/cards/${created.body.data.id}/progress`).send({ status: 'MASTERED' }).expect(400);
   });
 });
 
 describe('quiz', () => {
   /** Seeds a deck with one question and returns its id and correct index. */
   async function makeQuestion(deckId: string, correctIndex = 1) {
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/quiz/questions`)
       .send({
         prompt: 'Which method is idempotent?',
@@ -278,7 +399,7 @@ describe('quiz', () => {
     const { deckId } = await makeDeck();
     await makeQuestion(deckId);
 
-    const response = await request(app).get(`/api/subsections/${deckId}/quiz`).expect(200);
+    const response = await api().get(`/api/subsections/${deckId}/quiz`).expect(200);
 
     expect(response.body.data[0].correctIndex).toBeUndefined();
     expect(response.body.data[0].explanation).toBeNull();
@@ -287,7 +408,7 @@ describe('quiz', () => {
   it('rejects a question whose correctIndex is out of range', async () => {
     const { deckId } = await makeDeck();
 
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/quiz/questions`)
       .send({ prompt: 'p', options: ['a', 'b'], correctIndex: 5 })
       .expect(400);
@@ -299,7 +420,7 @@ describe('quiz', () => {
     const { deckId } = await makeDeck();
     const questionId = await makeQuestion(deckId, 1);
 
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/quiz/attempts`)
       .send({ answers: [{ questionId, selectedIndex: 1 }], durationMs: 5000 })
       .expect(201);
@@ -319,7 +440,7 @@ describe('quiz', () => {
     const { deckId } = await makeDeck();
     const questionId = await makeQuestion(deckId, 1);
 
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/quiz/attempts`)
       .send({ answers: [{ questionId, selectedIndex: 0 }], durationMs: 3000 })
       .expect(201);
@@ -334,7 +455,7 @@ describe('quiz', () => {
     const b = await makeDeck();
     const foreignQuestion = await makeQuestion(b.deckId);
 
-    await request(app)
+    await api()
       .post(`/api/subsections/${a.deckId}/quiz/attempts`)
       .send({ answers: [{ questionId: foreignQuestion, selectedIndex: 0 }], durationMs: 1000 })
       .expect(400);
@@ -343,30 +464,30 @@ describe('quiz', () => {
   it('generates a quiz from the deck cards once there are enough of them', async () => {
     const { deckId } = await makeDeck();
     for (let i = 1; i <= 5; i++) {
-      await request(app)
+      await api()
         .post(`/api/subsections/${deckId}/cards`)
         .send({ front: `Term ${i}`, back: `Definition number ${i}` })
         .expect(201);
     }
 
-    const response = await request(app).post(`/api/subsections/${deckId}/quiz/generate`).expect(201);
+    const response = await api().post(`/api/subsections/${deckId}/quiz/generate`).expect(201);
     expect(response.body.data.length).toBeGreaterThan(0);
     expect(response.body.data[0].options).toHaveLength(4);
   });
 
   it('will not generate a quiz from a deck with too few cards', async () => {
     const { deckId } = await makeDeck();
-    await request(app).post(`/api/subsections/${deckId}/cards`).send({ front: 'a', back: 'b' }).expect(201);
+    await api().post(`/api/subsections/${deckId}/cards`).send({ front: 'a', back: 'b' }).expect(201);
 
-    await request(app).post(`/api/subsections/${deckId}/quiz/generate`).expect(400);
+    await api().post(`/api/subsections/${deckId}/quiz/generate`).expect(400);
   });
 
   it('deletes a question', async () => {
     const { deckId } = await makeDeck();
     const questionId = await makeQuestion(deckId);
 
-    await request(app).delete(`/api/questions/${questionId}`).expect(204);
-    const response = await request(app).get(`/api/subsections/${deckId}/quiz`).expect(200);
+    await api().delete(`/api/questions/${questionId}`).expect(204);
+    const response = await api().get(`/api/subsections/${deckId}/quiz`).expect(200);
     expect(response.body.data).toHaveLength(0);
   });
 });
@@ -379,7 +500,7 @@ describe('PowerPoint import', () => {
       { title: 'Slide two', bullets: ['point b'] },
     ]);
 
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/import?preview=true`)
       .attach('file', buffer, 'deck.pptx')
       .expect(200);
@@ -396,7 +517,7 @@ describe('PowerPoint import', () => {
       { title: 'What is smoke testing?', bullets: ['A shallow, wide check'] },
     ]);
 
-    const response = await request(app)
+    const response = await api()
       .post(`/api/subsections/${deckId}/import`)
       .attach('file', buffer, 'deck.pptx')
       .expect(201);
@@ -404,7 +525,7 @@ describe('PowerPoint import', () => {
     expect(response.body.data.imported).toBe(2);
     expect(response.body.data.newBadges.map((b: { code: string }) => b.code)).toContain('IMPORTER');
 
-    const cards = await request(app).get(`/api/subsections/${deckId}/cards`).expect(200);
+    const cards = await api().get(`/api/subsections/${deckId}/cards`).expect(200);
     expect(cards.body.data[0].front).toBe('What is regression testing?');
     expect(cards.body.data[0].sourceSlide).toBe(1);
     expect(cards.body.data[0].notes).toBe('Mention automation.');
@@ -412,19 +533,19 @@ describe('PowerPoint import', () => {
 
   it('appends to a deck that already has cards rather than replacing them', async () => {
     const { deckId } = await makeDeck();
-    await request(app).post(`/api/subsections/${deckId}/cards`).send({ front: 'Manual', back: 'x' }).expect(201);
+    await api().post(`/api/subsections/${deckId}/cards`).send({ front: 'Manual', back: 'x' }).expect(201);
 
     const buffer = await buildPptx([{ title: 'Imported', bullets: ['y'] }]);
-    await request(app).post(`/api/subsections/${deckId}/import`).attach('file', buffer, 'd.pptx').expect(201);
+    await api().post(`/api/subsections/${deckId}/import`).attach('file', buffer, 'd.pptx').expect(201);
 
-    const cards = await request(app).get(`/api/subsections/${deckId}/cards`).expect(200);
+    const cards = await api().get(`/api/subsections/${deckId}/cards`).expect(200);
     expect(cards.body.data.map((c: { front: string }) => c.front)).toEqual(['Manual', 'Imported']);
   });
 
   it('rejects a file that is not a .pptx', async () => {
     const { deckId } = await makeDeck();
 
-    await request(app)
+    await api()
       .post(`/api/subsections/${deckId}/import`)
       .attach('file', Buffer.from('hello'), 'notes.txt')
       .expect(415);
@@ -432,30 +553,88 @@ describe('PowerPoint import', () => {
 
   it('rejects a request with no file attached', async () => {
     const { deckId } = await makeDeck();
-    await request(app).post(`/api/subsections/${deckId}/import`).expect(400);
+    await api().post(`/api/subsections/${deckId}/import`).expect(400);
   });
 });
 
 describe('progress rollup', () => {
   it('splits totals by track', async () => {
-    const process = await request(app)
+    const process = await api()
       .post('/api/sections')
       .send({ name: 'Proc', track: 'PROCESS' })
       .expect(201);
-    const procDeck = await request(app)
+    const procDeck = await api()
       .post(`/api/sections/${process.body.data.id}/subsections`)
       .send({ name: 'D' })
       .expect(201);
-    await request(app)
+    await api()
       .post(`/api/subsections/${procDeck.body.data.id}/cards`)
       .send({ front: 'a', back: 'b' })
       .expect(201);
 
-    const response = await request(app).get('/api/progress').expect(200);
+    const response = await api().get('/api/progress').expect(200);
 
     expect(response.body.data.process.total).toBe(1);
     expect(response.body.data.technical.total).toBe(0);
     expect(response.body.data.overall.total).toBe(1);
+  });
+});
+
+describe('auth', () => {
+  it('registers, then rejects a second registration with the same email', async () => {
+    const email = `dupe-${Math.random().toString(36).slice(2)}@example.com`;
+    await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'A', email, password: 'password123' })
+      .expect(201);
+
+    const second = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'B', email, password: 'password123' })
+      .expect(409);
+    expect(second.body.error.code).toBe('CONFLICT');
+  });
+
+  it('logs in with the right password and rejects the wrong one', async () => {
+    const email = `login-${Math.random().toString(36).slice(2)}@example.com`;
+    await request(app).post('/api/auth/register').send({ name: 'A', email, password: 'password123' }).expect(201);
+
+    const wrong = await request(app).post('/api/auth/login').send({ email, password: 'nope-nope' }).expect(401);
+    expect(wrong.body.error.code).toBe('INVALID_CREDENTIALS');
+
+    const right = await request(app).post('/api/auth/login').send({ email, password: 'password123' }).expect(200);
+    expect(right.body.data.token).toBeTruthy();
+    expect(right.body.data.profile.name).toBe('A');
+  });
+
+  it('rejects protected routes with no token and with a garbage token', async () => {
+    await request(app).get('/api/profile').expect(401);
+    await request(app).get('/api/profile').set('Authorization', 'Bearer garbage').expect(401);
+  });
+
+  it('resolves the current session via /auth/me', async () => {
+    const response = await api().get('/api/auth/me').expect(200);
+    expect(response.body.data.name).toBe('Tester');
+  });
+});
+
+describe('leaderboard', () => {
+  it('ranks players by XP, highlighting the caller', async () => {
+    const other = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Rival', email: `rival-${Math.random().toString(36).slice(2)}@example.com`, password: 'password123' })
+      .expect(201);
+
+    const { deckId } = await makeDeck();
+    const card = await api().post(`/api/subsections/${deckId}/cards`).send({ front: 'F', back: 'B' }).expect(201);
+    await api().put(`/api/cards/${card.body.data.id}/progress`).send({ status: 'KNOWN', flipped: true }).expect(200);
+
+    const board = await api().get('/api/leaderboard').expect(200);
+
+    expect(board.body.data[0].name).toBe('Tester');
+    expect(board.body.data[0].xp).toBe(20);
+    expect(board.body.data[0].isYou).toBe(true);
+    expect(board.body.data.map((e: { name: string }) => e.name)).toContain(other.body.data.profile.name);
   });
 });
 

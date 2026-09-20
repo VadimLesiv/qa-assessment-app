@@ -120,6 +120,8 @@ model QuizAttempt {
 model Player {
   id           String   @id @default(cuid())
   name         String
+  email        String?  @unique
+  passwordHash String?
   xp           Int      @default(0)
   streakDays   Int      @default(0)
   lastActiveAt DateTime?

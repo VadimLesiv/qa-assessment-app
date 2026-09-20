@@ -125,6 +125,36 @@ export interface PlayerProfile {
   badges: Badge[];
 }
 
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export interface AuthResult {
+  token: string;
+  profile: PlayerProfile;
+}
+
+/** One row of the all-players leaderboard, ranked by XP. */
+export interface LeaderboardEntry {
+  rank: number;
+  playerId: string;
+  name: string;
+  xp: number;
+  level: number;
+  streakDays: number;
+  quizAttempts: number;
+  badgeCount: number;
+  /** True for the row belonging to the signed-in viewer, so the UI can highlight it. */
+  isYou: boolean;
+}
+
 /** Result of parsing an uploaded .pptx, returned before anything is persisted. */
 export interface ImportPreview {
   fileName: string;
@@ -164,6 +194,11 @@ export interface CreateSectionInput {
 
 export type UpdateSectionInput = Partial<CreateSectionInput> & { order?: number };
 
+/** Drag-and-drop result: each section's `order` becomes its index in `ids`. */
+export interface ReorderSectionsInput {
+  ids: string[];
+}
+
 export interface CreateSubSectionInput {
   name: string;
   description?: string | null;
@@ -174,6 +209,14 @@ export type UpdateSubSectionInput = Partial<CreateSubSectionInput> & {
   /** Move the sub-section to a different section. */
   sectionId?: string;
 };
+
+/**
+ * Drag-and-drop result for decks. Each group is the complete, final deck list of
+ * one section; a move between sections sends the source and target groups.
+ */
+export interface ReorderSubSectionsInput {
+  groups: { sectionId: string; subSectionIds: string[] }[];
+}
 
 export interface CreateCardInput {
   front: string;

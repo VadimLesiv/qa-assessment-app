@@ -32,6 +32,11 @@ rating, and XP, levels, streaks and badges keep the loop rewarding.
 - Keyboard-first drilling: <kbd>←</kbd> <kbd>→</kbd> navigate, <kbd>K</kbd> known, <kbd>L</kbd> still learning
 - A dot strip under the card doubles as a status map of the whole deck
 
+**Accounts**
+- Email/password sign-up and sign-in, JWT-based
+- Every learner's XP, streak and quiz history is scoped to their own account
+- A live leaderboard ranks every registered player by total XP
+
 **Assessment**
 - Two tracks, seeded with real content: **Process** and **Technical**
 - Multiple-choice quizzes with difficulty-weighted XP and a 0–5 star rating
@@ -139,9 +144,19 @@ qa-assessment-app/
 
 `Section` (track: PROCESS | TECHNICAL) → `SubSection` (a deck) → `Card`, with
 `QuizQuestion` attached to a sub-section. Learner state lives in `Player`,
-`CardProgress`, `QuizAttempt` and `EarnedBadge`. Every learner row is already
-keyed by `playerId`, so adding real accounts later is a routing change rather
-than a migration.
+`CardProgress`, `QuizAttempt` and `EarnedBadge`. `Player` doubles as the
+account: `email` and `passwordHash` are set on sign-up, and every other
+learner row is keyed by `playerId`.
+
+**Auth**
+
+Sign-up and sign-in issue a JWT (`Authorization: Bearer <token>`, 30-day
+expiry) identifying the player; there is no session store. Every route that
+reads or writes learner state resolves the caller from that token, so all
+of `/profile`, `/progress`, card progress and quiz attempts are scoped to
+the signed-in player automatically. The one pre-account `Player` row a
+fresh clone seeds via manual use is claimed by whoever registers first,
+rather than being stranded.
 
 SQLite has no array type, so card bullets and quiz options are stored as JSON
 strings and parsed in one serializer layer.
@@ -152,6 +167,22 @@ strings and parsed in one serializer layer.
 
 Base URL `http://localhost:4000/api`. All responses are wrapped in `{ "data": … }`;
 errors use `{ "error": { code, message, details? } }`.
+
+### Auth
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Create an account, returns `{ token, profile }` |
+| `POST` | `/auth/login` | Sign in with email + password, returns `{ token, profile }` |
+| `GET` | `/auth/me` | Resolve the current token back to a profile, for session restore |
+
+Every other route below requires `Authorization: Bearer <token>`.
+
+### Leaderboard
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/leaderboard` | All registered players, ranked by total XP |
 
 ### Sections
 
@@ -327,8 +358,8 @@ questions against the deck.
 
 **Web development** — React 18, typed end to end, no UI framework. The theme is
 plain CSS custom properties in one file, so restyling is approachable. Obvious
-extensions: drag-and-drop reordering, spaced repetition scheduling, real
-accounts and auth, and a deck-sharing export/import format.
+extensions: spaced repetition scheduling, password reset, and a deck-sharing
+export/import format.
 
 ---
 

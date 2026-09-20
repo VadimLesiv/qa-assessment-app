@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  AuthResult,
   Badge,
   Card,
   CardStatus,
@@ -7,10 +8,15 @@ import type {
   CreateSectionInput,
   CreateSubSectionInput,
   ImportPreview,
+  LeaderboardEntry,
+  LoginInput,
   PlayerProfile,
   ProgressSummary,
   QuizQuestion,
   QuizResult,
+  RegisterInput,
+  ReorderSectionsInput,
+  ReorderSubSectionsInput,
   Section,
   SubSection,
   SubmitQuizInput,
@@ -21,6 +27,17 @@ import type {
 
 /** Vite proxies /api to the backend in dev, so a relative base works everywhere. */
 const BASE = '/api';
+
+const TOKEN_KEY = 'qa.token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
 
 /** Thrown for any non-2xx response, carrying the server's structured detail. */
 export class ApiRequestError extends Error {
@@ -44,11 +61,13 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const response = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
       // FormData sets its own multipart boundary, so only set JSON explicitly.
       ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
   });
@@ -60,6 +79,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const err = (payload as ApiError | null)?.error;
+    if (response.status === 401) setToken(null);
     throw new ApiRequestError(
       response.status,
       err?.code ?? 'UNKNOWN',
@@ -89,6 +109,10 @@ export const api = {
 
   deleteSection: (id: string) => request<void>(`/sections/${id}`, { method: 'DELETE' }),
 
+  /** Persists a drag-and-drop reshuffle of the section list. */
+  reorderSections: (ids: string[]) =>
+    request<void>('/sections/reorder', { method: 'PUT', body: JSON.stringify({ ids } satisfies ReorderSectionsInput) }),
+
   /* ---------------------------------------------------------------- */
   /* Sub-sections                                                      */
   /* ---------------------------------------------------------------- */
@@ -107,6 +131,13 @@ export const api = {
     request<SubSection>(`/subsections/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
 
   deleteSubSection: (id: string) => request<void>(`/subsections/${id}`, { method: 'DELETE' }),
+
+  /** Reorders decks and/or moves them between sections in one atomic call. */
+  reorderSubSections: (groups: ReorderSubSectionsInput['groups']) =>
+    request<void>('/subsections/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ groups } satisfies ReorderSubSectionsInput),
+    }),
 
   /* ---------------------------------------------------------------- */
   /* Cards                                                             */
@@ -188,4 +219,22 @@ export const api = {
     request<{ overall: ProgressSummary; process: ProgressSummary; technical: ProgressSummary }>(
       '/progress',
     ),
+
+  /* ---------------------------------------------------------------- */
+  /* Auth                                                              */
+  /* ---------------------------------------------------------------- */
+
+  register: (input: RegisterInput) =>
+    request<AuthResult>('/auth/register', { method: 'POST', body: JSON.stringify(input) }),
+
+  login: (input: LoginInput) =>
+    request<AuthResult>('/auth/login', { method: 'POST', body: JSON.stringify(input) }),
+
+  me: () => request<PlayerProfile>('/auth/me'),
+
+  /* ---------------------------------------------------------------- */
+  /* Leaderboard                                                       */
+  /* ---------------------------------------------------------------- */
+
+  getLeaderboard: () => request<LeaderboardEntry[]>('/leaderboard'),
 };

@@ -3,6 +3,7 @@ import { usePlayer } from '../lib/PlayerContext';
 
 const NAV = [
   { to: '/', label: 'Dashboard', end: true },
+  { to: '/leaderboard', label: 'Leaderboard', end: false },
   { to: '/manage', label: 'Manage', end: false },
   { to: '/profile', label: 'Profile', end: false },
 ];
@@ -12,7 +13,7 @@ const NAV = [
  * daily streak. Mirrors the status bar of a game rather than an app toolbar.
  */
 export function Hud() {
-  const { profile } = usePlayer();
+  const { profile, isAuthenticated, logout } = usePlayer();
 
   const xpIntoLevel = profile ? profile.xp - profile.levelStartXp : 0;
   const xpNeeded = profile ? profile.nextLevelXp - profile.levelStartXp : 1;
@@ -27,18 +28,20 @@ export function Hud() {
         QA Assessment
       </NavLink>
 
-      <nav className="hud-nav">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) => `hud-link${isActive ? ' is-active' : ''}`}
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
+      {isAuthenticated && (
+        <nav className="hud-nav">
+          {NAV.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => `hud-link${isActive ? ' is-active' : ''}`}
+            >
+              {item.label}
+            </NavLink>
+          ))}
+        </nav>
+      )}
 
       {profile && (
         <div className="hud-stats">
@@ -71,6 +74,10 @@ export function Hud() {
             <span aria-hidden="true">🔥</span>
             {profile.streakDays}
           </div>
+
+          <button type="button" className="btn btn--ghost btn--sm" onClick={logout}>
+            Sign out
+          </button>
         </div>
       )}
     </header>

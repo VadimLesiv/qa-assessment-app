@@ -24,6 +24,22 @@ const updateSchema = createSchema.partial().extend({
   sectionId: z.string().min(1).optional(),
 });
 
+/**
+ * A drag-and-drop reshuffle is described as the full, final deck list of every
+ * section the drag touched - one group for a move inside a section, two for a
+ * move across sections.
+ */
+const reorderSchema = z.object({
+  groups: z
+    .array(
+      z.object({
+        sectionId: z.string().min(1),
+        subSectionIds: z.array(z.string().min(1)),
+      }),
+    )
+    .min(1, 'Send at least one section'),
+});
+
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 25 * 1024 * 1024);
 
 const upload = multer({
@@ -145,6 +161,48 @@ subSectionsRouter.get(
         cards: sub.cards.map((c) => serializeCard(c, map.get(c.id) ?? 'NEW')),
       },
     });
+  }),
+);
+
+/**
+ * PUT /api/subsections/reorder
+ * Re-seats every listed deck into the given section at the given position, so a
+ * single call covers both reordering and moving between sections. Declared
+ * before `/:id` so "reorder" is not read as a deck id.
+ */
+subSectionsRouter.put(
+  '/reorder',
+  asyncHandler(async (req, res) => {
+    const { groups } = reorderSchema.parse(req.body);
+
+    const sectionIds = groups.map((g) => g.sectionId);
+    if (new Set(sectionIds).size !== sectionIds.length) {
+      throw HttpError.badRequest('Each section may only appear once');
+    }
+
+    const deckIds = groups.flatMap((g) => g.subSectionIds);
+    if (new Set(deckIds).size !== deckIds.length) {
+      throw HttpError.badRequest('Each deck may only appear once');
+    }
+
+    const sections = await prisma.section.findMany({ where: { id: { in: sectionIds } }, select: { id: true } });
+    if (sections.length !== sectionIds.length) throw HttpError.badRequest('One or more sections no longer exist');
+
+    const decks = await prisma.subSection.findMany({ where: { id: { in: deckIds } }, select: { id: true } });
+    if (decks.length !== deckIds.length) throw HttpError.badRequest('One or more decks no longer exist');
+
+    await prisma.$transaction(
+      groups.flatMap((group) =>
+        group.subSectionIds.map((id, index) =>
+          prisma.subSection.update({
+            where: { id },
+            data: { sectionId: group.sectionId, order: index },
+          }),
+        ),
+      ),
+    );
+
+    res.status(204).end();
   }),
 );
 

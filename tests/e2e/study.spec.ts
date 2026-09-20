@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * End-to-end coverage of the learner's main path: pick a section, flip through a
@@ -104,7 +105,8 @@ test.describe('studying a deck', () => {
     await page.getByPlaceholder('e.g. Boundary Value Analysis').fill('Probe Deck');
     await page.getByRole('button', { name: 'Save' }).click();
 
-    await section.getByRole('button', { name: 'Cards' }).click();
+    // `exact` keeps this off the "Reorder section …" drag handle.
+    await section.getByRole('button', { name: 'Cards', exact: true }).click();
     await page.getByRole('button', { name: '＋ Add card' }).click();
     await page.getByPlaceholder('What is boundary value analysis?').fill('Probe question?');
     await page.getByPlaceholder(/Testing at the edges/).fill('Probe answer.');
@@ -213,7 +215,8 @@ test.describe('content management', () => {
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(section.getByText('E2E Deck')).toBeVisible();
 
-    await section.getByRole('button', { name: 'Cards' }).click();
+    // `exact` keeps this off the "Reorder section …" drag handle.
+    await section.getByRole('button', { name: 'Cards', exact: true }).click();
     await page.getByRole('button', { name: '＋ Add card' }).click();
     await page.getByPlaceholder('What is boundary value analysis?').fill('E2E question?');
     await page.getByPlaceholder(/Testing at the edges/).fill('E2E answer.');
@@ -224,6 +227,127 @@ test.describe('content management', () => {
     // Clean up so repeated runs do not accumulate sections.
     await page.locator('.panel').filter({ hasText: sectionName }).getByRole('button', { name: '🗑' }).first().click();
     await page.getByRole('button', { name: 'Delete' }).click();
+  });
+});
+
+test.describe('reordering by drag & drop', () => {
+  /** Creates a section on the Manage page and returns its panel. */
+  async function createSection(page: Page, name: string) {
+    await page.getByRole('button', { name: '＋ New section' }).click();
+    await page.getByPlaceholder('e.g. Test Design Techniques').fill(name);
+    await page.getByRole('button', { name: 'Save' }).click();
+
+    const section = page.locator('.panel').filter({ hasText: name });
+    await expect(section).toBeVisible();
+    return section;
+  }
+
+  async function addDeck(page: Page, section: Locator, name: string) {
+    await section.getByRole('button', { name: '＋ Deck' }).click();
+    await page.getByPlaceholder('e.g. Boundary Value Analysis').fill(name);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await expect(section.locator('.deck-row-name').filter({ hasText: name })).toBeVisible();
+  }
+
+  async function deleteSection(page: Page, name: string) {
+    await page.locator('.panel').filter({ hasText: name }).getByRole('button', { name: '🗑' }).first().click();
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await expect(page.locator('.panel').filter({ hasText: name })).toHaveCount(0);
+  }
+
+  const deckNames = (section: Locator) => section.locator('.deck-row-name');
+
+  test('moves a deck above its sibling and the new order survives a reload', async ({ page }) => {
+    const name = `E2E Reorder ${Date.now()}`;
+
+    await page.goto('/manage');
+    const section = await createSection(page, name);
+    await addDeck(page, section, 'Alpha Deck');
+    await addDeck(page, section, 'Beta Deck');
+    await expect(deckNames(section)).toHaveText(['Alpha Deck', 'Beta Deck']);
+
+    // Both rows must be on screen before the drag, or the drop point moves under
+    // the pointer as the page scrolls.
+    await section.scrollIntoViewIfNeeded();
+
+    // Dropping on the top half of Alpha inserts Beta in front of it.
+    await section
+      .locator('.deck-row')
+      .filter({ hasText: 'Beta Deck' })
+      .locator('.drag-handle')
+      .dragTo(section.locator('.deck-row').filter({ hasText: 'Alpha Deck' }), {
+        targetPosition: { x: 40, y: 4 },
+      });
+
+    await expect(deckNames(section)).toHaveText(['Beta Deck', 'Alpha Deck']);
+
+    await page.reload();
+    await expect(deckNames(page.locator('.panel').filter({ hasText: name }))).toHaveText([
+      'Beta Deck',
+      'Alpha Deck',
+    ]);
+
+    await deleteSection(page, name);
+  });
+
+  test('drags a deck into another section', async ({ page }) => {
+    const from = `E2E From ${Date.now()}`;
+    const to = `E2E To ${Date.now()}`;
+
+    await page.goto('/manage');
+    const source = await createSection(page, from);
+    await addDeck(page, source, 'Travelling Deck');
+    const target = await createSection(page, to);
+    await source.scrollIntoViewIfNeeded();
+
+    // Handle 0 is the section's own; handle 1 belongs to its single deck.
+    await source.locator('.drag-handle').nth(1).dragTo(target);
+
+    await expect(deckNames(page.locator('.panel').filter({ hasText: to }))).toHaveText(['Travelling Deck']);
+    await expect(page.locator('.panel').filter({ hasText: from })).toContainText('No decks in this section yet');
+
+    // The move is persisted, not just painted.
+    await page.reload();
+    await expect(deckNames(page.locator('.panel').filter({ hasText: to }))).toHaveText(['Travelling Deck']);
+
+    await deleteSection(page, from);
+    await deleteSection(page, to);
+  });
+
+  test('reorders sections with the keyboard', async ({ page }) => {
+    const name = `E2E Keys ${Date.now()}`;
+
+    await page.goto('/manage');
+    await createSection(page, name);
+
+    /** The rendered section order, read off the panels themselves. */
+    const order = () =>
+      page.locator('.panel.sortable').evaluateAll((panels) =>
+        panels.map((panel) => (panel as HTMLElement).dataset.sectionName ?? ''),
+      );
+
+    // A new section is placed by track, so its index has to be looked up, and
+    // one sitting last can only be nudged upwards.
+    const before = await order();
+    const index = before.indexOf(name);
+    expect(index).toBeGreaterThanOrEqual(0);
+    const step = index === before.length - 1 ? -1 : 1;
+    const landing = index + step;
+
+    await page.locator('.panel').filter({ hasText: name }).locator('.drag-handle').first().focus();
+    await page.keyboard.press(step === 1 ? 'ArrowDown' : 'ArrowUp');
+
+    await expect(page.locator('.toast').filter({ hasText: 'Section order saved' })).toBeVisible();
+
+    const expected = [...before];
+    expected[index] = before[landing]!;
+    expected[landing] = name;
+    expect(await order()).toEqual(expected);
+
+    await page.reload();
+    await expect(page.locator('.panel.sortable').nth(landing)).toContainText(name);
+
+    await deleteSection(page, name);
   });
 });
 

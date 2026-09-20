@@ -24,6 +24,13 @@ const createSchema = z.object({
 
 const updateSchema = createSchema.partial().extend({ order: z.number().int().min(0).optional() });
 
+const reorderSchema = z.object({
+  ids: z
+    .array(z.string().min(1))
+    .min(1, 'Send at least one section id')
+    .refine((ids) => new Set(ids).size === ids.length, 'Section ids must be unique'),
+});
+
 /** Slugs are unique; append -2, -3 ... until a free one is found. */
 async function uniqueSlug(name: string, ignoreId?: string): Promise<string> {
   const base = slugify(name);
@@ -145,6 +152,29 @@ sectionsRouter.post(
     });
 
     res.status(201).json({ data: serializeSection(section, { subSections: [] }) });
+  }),
+);
+
+/**
+ * PUT /api/sections/reorder
+ * Persists a drag-and-drop reshuffle: every section listed gets its `order` set
+ * to its position in `ids`. Declared before `/:id` so "reorder" is not read as
+ * a section id.
+ */
+sectionsRouter.put(
+  '/reorder',
+  asyncHandler(async (req, res) => {
+    const { ids } = reorderSchema.parse(req.body);
+
+    const found = await prisma.section.findMany({ where: { id: { in: ids } }, select: { id: true } });
+    if (found.length !== ids.length) throw HttpError.badRequest('One or more sections no longer exist');
+
+    // One transaction so a failed write can never leave a half-applied order.
+    await prisma.$transaction(
+      ids.map((id, index) => prisma.section.update({ where: { id }, data: { order: index } })),
+    );
+
+    res.status(204).end();
   }),
 );
 
