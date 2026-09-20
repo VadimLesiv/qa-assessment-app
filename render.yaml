@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: qa-assessment-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build --workspace @qa/shared && npm run build --workspace @qa/api && npx prisma db push --schema apps/api/prisma/schema.prisma
+    startCommand: node apps/api/dist/server.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: WEB_ORIGIN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: MAX_UPLOAD_BYTES
+        value: "26214400"

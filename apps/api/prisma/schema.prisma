@@ -1,14 +1,15 @@
 // QA Assessment App - data model
 //
-// SQLite has no native array or enum type, so list-valued fields (card bullets,
-// quiz options) are stored as JSON strings and parsed in the serializer layer.
+// List-valued fields (card bullets, quiz options) are stored as JSON strings
+// and parsed in the serializer layer, so the schema stays portable across
+// database providers without native array/enum columns.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

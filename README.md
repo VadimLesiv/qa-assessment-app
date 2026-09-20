@@ -18,6 +18,7 @@ rating, and XP, levels, streaks and badges keep the loop rewarding.
 - [Importing PowerPoint decks](#importing-powerpoint-decks)
 - [Gamification rules](#gamification-rules)
 - [Testing](#testing)
+- [Deployment](#deployment)
 - [Using this repo to practise](#using-this-repo-to-practise)
 - [Troubleshooting](#troubleshooting)
 
@@ -67,10 +68,11 @@ cd qa-assessment-app
 
 npm install
 
-# Configure the API
+# Configure the API - fill in DATABASE_URL with a free Postgres database
+# (e.g. from neon.tech or supabase.com) before continuing
 cp .env.example apps/api/.env
 
-# Create the SQLite schema and load the starter curriculum
+# Create the schema and load the starter curriculum
 npm run db:push
 npm run db:seed
 
@@ -94,7 +96,7 @@ performance testing.
 | `npm test` | API unit and integration tests (Vitest) |
 | `npm run test:e2e` | Browser tests (Playwright); starts the servers itself |
 | `npm run test:e2e:ui` | Playwright in interactive UI mode |
-| `npm run db:push` | Apply the Prisma schema to SQLite |
+| `npm run db:push` | Apply the Prisma schema to Postgres |
 | `npm run db:seed` | Load (or reload) the starter curriculum |
 | `npm run db:reset` | **Destructive.** Drop everything and re-seed |
 
@@ -323,9 +325,10 @@ npm run test:e2e   # 12 Playwright browser tests
 real app instance, the `.pptx` parser, the quiz generator, and the XP, level,
 star, progress and streak formulas.
 
-The suite runs against a **separate `test.db`** that is created and destroyed per
-run. `tests/setup.ts` refuses to start if `DATABASE_URL` does not point at a
-test database — the suite truncates tables between tests, so that guard is what
+The suite runs against a **separate Postgres database**, set via
+`TEST_DATABASE_URL` in `apps/api/.env` (see `.env.example`). `tests/setup.ts`
+refuses to start if that variable is unset or doesn't look like a test
+database — the suite truncates tables between tests, so that guard is what
 stops it from ever wiping your development data.
 
 `tests/helpers/pptx.ts` builds real `.pptx` files in memory with JSZip, so import
@@ -360,6 +363,47 @@ questions against the deck.
 plain CSS custom properties in one file, so restyling is approachable. Obvious
 extensions: spaced repetition scheduling, password reset, and a deck-sharing
 export/import format.
+
+---
+
+## Deployment
+
+Free-tier split: the API + Postgres run on **Render**, the built web client on
+**Netlify**. Netlify proxies `/api/*` to Render server-side, so the browser
+only ever talks to one origin — `apps/web/src/lib/api.ts` needs no changes and
+there's no CORS preflight to configure.
+
+1. **Database.** Create two free Postgres projects (one for local dev, one for
+   production) on [Neon](https://neon.tech) or [Supabase](https://supabase.com).
+   Keeping them separate means `npm run db:reset` locally can never touch
+   deployed data. Copy each connection string.
+
+2. **Local dev.** Put the dev project's connection string in
+   `apps/api/.env` as `DATABASE_URL` (see `.env.example`), then run
+   `npm run db:push && npm run db:seed` as usual.
+
+3. **API on Render.** Create a new Web Service from this repo — Render will
+   pick up [`render.yaml`](render.yaml) and configure the build/start commands
+   automatically. Set these environment variables in the Render dashboard:
+   - `DATABASE_URL` — the **production** Neon/Supabase connection string
+   - `JWT_SECRET` — a long random string (not the dev fallback)
+   - `WEB_ORIGIN` — your Netlify URL, e.g. `https://your-site.netlify.app`
+   - `ANTHROPIC_API_KEY` — optional, only for AI-generated quizzes
+
+   The build step runs `prisma db push` against the production database, so
+   the schema is created automatically on first deploy. Seed it once with
+   `DATABASE_URL=<production-url> npm run db:seed` from your machine.
+
+4. **Web on Netlify.** Create a new site from this repo — Netlify will pick up
+   [`netlify.toml`](netlify.toml). Edit the `to` URL in that file's `/api/*`
+   redirect to match your actual Render service URL before deploying (Render
+   assigns it as `https://<service-name>.onrender.com`).
+
+5. **Verify.** Open the Netlify URL, register a player, and confirm quizzes,
+   the leaderboard and progress all round-trip through the deployed API.
+
+Render's free web services spin down after inactivity, so the first request
+after a quiet period can take ~30s to wake up.
 
 ---
 

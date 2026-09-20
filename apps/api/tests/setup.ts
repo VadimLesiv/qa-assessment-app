@@ -1,52 +1,41 @@
 /**
- * Points every test at a throwaway SQLite file so a test run can never damage
- * the development database. The schema is pushed once before the suite starts.
+ * Points every test at a dedicated test database (TEST_DATABASE_URL) so a
+ * test run can never damage the development database. The suite truncates
+ * tables in beforeEach, so the target must be unmistakably a test database -
+ * refuse to run otherwise.
  */
 import { execSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { config } from 'dotenv';
 import { afterAll, beforeAll } from 'vitest';
 
-const TEST_DB = join(process.cwd(), 'prisma', 'test.db');
+// Unlike `tsx` (used for dev/build), plain Vitest doesn't auto-load .env.
+config();
+
+const testUrl = process.env.TEST_DATABASE_URL;
+
+if (!testUrl?.includes('test')) {
+  throw new Error(
+    `Refusing to run tests against ${testUrl ?? '(unset)'}. Set TEST_DATABASE_URL to a ` +
+      `dedicated Postgres database whose name includes "test".`,
+  );
+}
 
 // Set before any test file imports the Prisma client. Prisma loads .env via
 // dotenv, which never overwrites a variable that is already set, so this wins.
-process.env.DATABASE_URL = 'file:./test.db';
+process.env.DATABASE_URL = testUrl;
 process.env.NODE_ENV = 'test';
 
+// Neon's free tier scales to zero when idle, so the first connection of a
+// run can take a while to wake the branch up - hence the generous timeout.
 beforeAll(() => {
-  // The suite truncates tables in beforeEach. If the client were ever pointed at
-  // the development database that would silently destroy the seeded curriculum,
-  // so refuse to run at all unless the target is unmistakably the test database.
-  if (!process.env.DATABASE_URL?.includes('test.db')) {
-    throw new Error(`Refusing to run tests against ${process.env.DATABASE_URL ?? '(unset)'}`);
-  }
-
-  for (const suffix of ['', '-journal']) {
-    if (existsSync(TEST_DB + suffix)) rmSync(TEST_DB + suffix);
-  }
-
-  // The file was just deleted, so a plain push builds the schema from scratch.
-  // --force-reset is deliberately avoided: it is a destructive operation, and
-  // deleting the file above already guarantees a clean database.
   execSync('npx prisma db push --skip-generate', {
     cwd: process.cwd(),
-    env: { ...process.env, DATABASE_URL: 'file:./test.db' },
+    env: { ...process.env, DATABASE_URL: testUrl },
     stdio: 'pipe',
   });
-});
+}, 30_000);
 
 afterAll(async () => {
-  // Windows keeps the file locked until the connection pool is closed, so the
-  // client must disconnect before the database file can be removed.
   const { prisma } = await import('../src/lib/prisma.js');
   await prisma.$disconnect();
-
-  for (const suffix of ['', '-journal']) {
-    try {
-      if (existsSync(TEST_DB + suffix)) rmSync(TEST_DB + suffix, { force: true });
-    } catch {
-      // A leftover file is harmless - beforeAll deletes it on the next run.
-    }
-  }
 });
