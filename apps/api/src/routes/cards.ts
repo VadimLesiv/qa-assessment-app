@@ -27,6 +27,14 @@ const progressSchema = z.object({
   flipped: z.boolean().optional(),
 });
 
+const reorderSchema = z.object({
+  subSectionId: z.string().min(1),
+  ids: z
+    .array(z.string().min(1))
+    .min(1, 'Send at least one card id')
+    .refine((ids) => new Set(ids).size === ids.length, 'Card ids must be unique'),
+});
+
 async function loadCardOrThrow(id: string) {
   const card = await prisma.card.findUnique({ where: { id } });
   if (!card) throw HttpError.notFound('Card');
@@ -41,6 +49,26 @@ cardsRouter.get(
     const card = await loadCardOrThrow(req.params.id!);
     const map = await statusMap(playerId, [card.id]);
     res.json({ data: serializeCard(card, map.get(card.id) ?? 'NEW') });
+  }),
+);
+
+/**
+ * PUT /api/cards/reorder
+ * Persists a drag-and-drop reshuffle inside one deck: each card's `order` is set
+ * to its position in `ids`. Declared before `/:id` so "reorder" is not read as
+ * a card id.
+ */
+cardsRouter.put(
+  '/reorder',
+  asyncHandler(async (req, res) => {
+    const { subSectionId, ids } = reorderSchema.parse(req.body);
+
+    const found = await prisma.card.findMany({ where: { id: { in: ids }, subSectionId }, select: { id: true } });
+    if (found.length !== ids.length) throw HttpError.badRequest('One or more cards are not in this deck');
+
+    await prisma.$transaction(ids.map((id, index) => prisma.card.update({ where: { id }, data: { order: index } })));
+
+    res.status(204).end();
   }),
 );
 

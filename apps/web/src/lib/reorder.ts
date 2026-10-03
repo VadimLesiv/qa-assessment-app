@@ -5,7 +5,7 @@
  * can paint the result immediately and persist exactly what it painted.
  */
 
-import type { Section, SubSection } from '@qa/shared';
+import type { Card, Section, SubSection } from '@qa/shared';
 
 /** Moves the item at `from` to sit at `to` in a copy of `list`. */
 export function moveItem<T>(list: T[], from: number, to: number): T[] {
@@ -40,6 +40,24 @@ export function moveSection(sections: Section[], sectionId: string, insertAt: nu
 
   const next = moveItem(sections, from, to);
   return { sections: next, ids: next.map((s) => s.id) };
+}
+
+export interface CardMove {
+  cards: Card[];
+  /** Card ids in their new order, ready for `api.reorderCards`. */
+  ids: string[];
+}
+
+/** Reorders the cards of one deck, where `insertAt` is a slot *between* cards. */
+export function moveCard(cards: Card[], cardId: string, insertAt: number): CardMove | null {
+  const from = cards.findIndex((c) => c.id === cardId);
+  if (from === -1) return null;
+
+  const to = toMoveIndex(from, insertAt);
+  if (to === from) return null;
+
+  const next = moveItem(cards, from, to);
+  return { cards: next, ids: next.map((c) => c.id) };
 }
 
 export interface DeckMove {

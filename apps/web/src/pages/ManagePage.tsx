@@ -3,7 +3,7 @@ import type { DragEvent, KeyboardEvent } from 'react';
 import type { Card, ImportPreview, Section, SectionTrack, SubSection } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { plural } from '../lib/format';
-import { moveDeck, moveSection } from '../lib/reorder';
+import { moveCard, moveDeck, moveSection } from '../lib/reorder';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Empty, ErrorBanner, Loading } from '../components/States';
 import { useToast } from '../components/Toast';
@@ -13,7 +13,10 @@ type DeckDraft = { id?: string; sectionId: string; name: string; description: st
 type CardDraft = { id?: string; front: string; back: string; bullets: string; notes: string };
 
 /** What the user picked up. Decks remember their origin so a move can be named. */
-type Drag = { kind: 'section'; id: string } | { kind: 'deck'; id: string; sectionId: string };
+type Drag =
+  | { kind: 'section'; id: string }
+  | { kind: 'deck'; id: string; sectionId: string }
+  | { kind: 'card'; id: string };
 
 /** Where it would land: an insertion slot in the section list or in a deck list. */
 type DropHint =
@@ -47,6 +50,8 @@ export function ManagePage() {
 
   const [drag, setDrag] = useState<Drag | null>(null);
   const [hint, setHint] = useState<DropHint | null>(null);
+  /** Insertion slot (between cards) in the open deck's card list. */
+  const [cardHint, setCardHint] = useState<number | null>(null);
 
   const toast = useToast();
 
@@ -88,6 +93,7 @@ export function ManagePage() {
   const clearDrag = () => {
     setDrag(null);
     setHint(null);
+    setCardHint(null);
   };
 
   /**
@@ -123,6 +129,43 @@ export function ManagePage() {
     );
   };
 
+  const applyCardMove = (cardId: string, insertAt: number) => {
+    if (!openDeck) return;
+    const move = moveCard(openDeck.cards, cardId, insertAt);
+    if (!move) return;
+
+    const deckId = openDeck.deck.id;
+    const previous = openDeck.cards;
+    setOpenDeck({ ...openDeck, cards: move.cards });
+    api
+      .reorderCards(deckId, move.ids)
+      .then(() => toast.info('Card order saved'))
+      .catch((err: unknown) => {
+        setOpenDeck((current) => (current && current.deck.id === deckId ? { ...current, cards: previous } : current));
+        toast.error(err instanceof ApiRequestError ? err.fieldSummary : 'The new order could not be saved');
+      });
+  };
+
+  const onCardDragOver = (event: DragEvent<HTMLElement>, index: number) => {
+    if (drag?.kind !== 'card') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setCardHint(insertIndexFor(event, index));
+  };
+
+  const onCardDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    if (drag?.kind === 'card' && cardHint !== null) applyCardMove(drag.id, cardHint);
+    clearDrag();
+  };
+
+  const nudgeCard = (cardId: string, delta: -1 | 1) => {
+    if (!openDeck) return;
+    const from = openDeck.cards.findIndex((c) => c.id === cardId);
+    if (from + delta < 0 || from + delta >= openDeck.cards.length) return;
+    applyCardMove(cardId, delta === -1 ? from - 1 : from + 2);
+  };
+
   const startDrag = (event: DragEvent<HTMLElement>, next: Drag) => {
     event.dataTransfer.effectAllowed = 'move';
     // Firefox will not start a drag unless the payload carries something.
@@ -141,7 +184,7 @@ export function ManagePage() {
 
   /** Anywhere on a section: reorders sections, or appends a dragged deck to it. */
   const onSectionDragOver = (event: DragEvent<HTMLElement>, section: Section, index: number) => {
-    if (!drag) return;
+    if (!drag || drag.kind === 'card') return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     if (drag.kind === 'section') setHint({ kind: 'section', index: insertIndexFor(event, index) });
@@ -239,7 +282,7 @@ export function ManagePage() {
           style={{ gap: 20 }}
           // Keeps the gaps between panels droppable: the last hint still stands,
           // so a release there lands where the drop line says it will.
-          onDragOver={(e) => drag && e.preventDefault()}
+          onDragOver={(e) => drag && drag.kind !== 'card' && e.preventDefault()}
           onDrop={onDrop}
         >
           {sections.map((section, sectionIndex) => (
@@ -449,9 +492,37 @@ export function ManagePage() {
               No cards yet — add one by hand or import a .pptx deck.
             </p>
           ) : (
-            <div className="stack" style={{ marginTop: 16, gap: 9 }}>
+            <div
+              className="stack"
+              style={{ marginTop: 16, gap: 9 }}
+              // Keeps the gaps between rows droppable, as for sections and decks.
+              onDragOver={(e) => drag?.kind === 'card' && e.preventDefault()}
+              onDrop={onCardDrop}
+            >
               {openDeck.cards.map((card, i) => (
-                <div key={card.id} className="deck-row" style={{ padding: '12px 15px' }}>
+                <div
+                  key={card.id}
+                  data-drag-root
+                  data-card-front={card.front}
+                  className={[
+                    'deck-row',
+                    'sortable',
+                    drag?.kind === 'card' && drag.id === card.id ? 'is-dragging' : '',
+                    cardHint === i ? 'is-drop-before' : '',
+                    cardHint === openDeck.cards.length && i === openDeck.cards.length - 1 ? 'is-drop-after' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  style={{ padding: '12px 15px' }}
+                  onDragOver={(e) => onCardDragOver(e, i)}
+                  onDragEnd={clearDrag}
+                >
+                  <DragHandle
+                    label={`Reorder card ${card.front}`}
+                    onDragStart={(e) => startDrag(e, { kind: 'card', id: card.id })}
+                    onDragEnd={clearDrag}
+                    onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeCard(card.id, delta))}
+                  />
                   <span style={{ color: 'var(--text-3)', fontWeight: 700, minWidth: 26 }}>{i + 1}</span>
                   <div className="deck-row-body">
                     <div className="deck-row-name" style={{ fontSize: 14 }}>

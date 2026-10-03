@@ -218,6 +218,12 @@ export interface ReorderSubSectionsInput {
   groups: { sectionId: string; subSectionIds: string[] }[];
 }
 
+/** Drag-and-drop result for cards: each card's `order` becomes its index in `ids`. */
+export interface ReorderCardsInput {
+  subSectionId: string;
+  ids: string[];
+}
+
 export interface CreateCardInput {
   front: string;
   back: string;

@@ -15,6 +15,7 @@ import type {
   QuizQuestion,
   QuizResult,
   RegisterInput,
+  ReorderCardsInput,
   ReorderSectionsInput,
   ReorderSubSectionsInput,
   Section,
@@ -149,6 +150,13 @@ export const api = {
 
   createCard: (subSectionId: string, input: CreateCardInput) =>
     request<Card>(`/subsections/${subSectionId}/cards`, { method: 'POST', body: JSON.stringify(input) }),
+
+  /** Persists a drag-and-drop reshuffle of the cards inside one deck. */
+  reorderCards: (subSectionId: string, ids: string[]) =>
+    request<void>('/cards/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ subSectionId, ids } satisfies ReorderCardsInput),
+    }),
 
   updateCard: (id: string, input: UpdateCardInput) =>
     request<Card>(`/cards/${id}`, { method: 'PUT', body: JSON.stringify(input) }),

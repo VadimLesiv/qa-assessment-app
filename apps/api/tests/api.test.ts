@@ -190,6 +190,34 @@ describe('sub-sections', () => {
     await api().put(`/api/subsections/${deckId}`).send({ sectionId: 'ghost' }).expect(400);
   });
 
+  it('reorders cards inside a deck and rejects cards from elsewhere', async () => {
+    const { deckId } = await makeDeck('Cards deck');
+    const other = await makeDeck('Other deck');
+    const ids: string[] = [];
+    for (const front of ['A', 'B', 'C']) {
+      const res = await api().post(`/api/subsections/${deckId}/cards`).send({ front, back: 'x' }).expect(201);
+      ids.push(res.body.data.id);
+    }
+    const foreign = await api()
+      .post(`/api/subsections/${other.deckId}/cards`)
+      .send({ front: 'Z', back: 'x' })
+      .expect(201);
+
+    await api()
+      .put('/api/cards/reorder')
+      .send({ subSectionId: deckId, ids: [ids[2], ids[0], ids[1]] })
+      .expect(204);
+
+    const listed = await api().get(`/api/subsections/${deckId}/cards`).expect(200);
+    expect(listed.body.data.map((c: { front: string }) => c.front)).toEqual(['C', 'A', 'B']);
+
+    await api()
+      .put('/api/cards/reorder')
+      .send({ subSectionId: deckId, ids: [ids[0], foreign.body.data.id] })
+      .expect(400);
+    await api().put('/api/cards/reorder').send({ subSectionId: deckId, ids: [ids[0], ids[0]] }).expect(400);
+  });
+
   it('reorders decks inside one section', async () => {
     const { sectionId, deckId: first } = await makeDeck('First');
     const second = await addDeck(sectionId, 'Second');
