@@ -54,11 +54,16 @@ function textFromXml(xml: string): string[] {
   return out;
 }
 
-/** Reads the XML parts we care about out of the archive, keyed by entry path. */
-async function readParts(buffer: Buffer): Promise<Map<string, string>> {
+/**
+ * Reads the XML parts we care about out of the archive, keyed by entry path.
+ * Given a file path, only the zip's central directory and the slide/notes entries
+ * are read from disk, so images and media in a large deck never enter memory.
+ */
+async function readParts(source: Buffer | string): Promise<Map<string, string>> {
   let directory: unzipper.CentralDirectory;
   try {
-    directory = await unzipper.Open.buffer(buffer);
+    directory =
+      typeof source === 'string' ? await unzipper.Open.file(source) : await unzipper.Open.buffer(source);
   } catch {
     throw HttpError.badRequest('That file is not a readable .pptx archive');
   }
@@ -77,11 +82,11 @@ async function readParts(buffer: Buffer): Promise<Map<string, string>> {
 }
 
 /**
- * Parses a .pptx buffer into draft cards. Nothing is written to the database
- * here - the caller decides whether to persist the preview.
+ * Parses a .pptx (an in-memory buffer or a path on disk) into draft cards. Nothing
+ * is written to the database here - the caller decides whether to persist the preview.
  */
-export async function parsePptx(buffer: Buffer, fileName: string): Promise<ImportPreview> {
-  const parts = await readParts(buffer);
+export async function parsePptx(source: Buffer | string, fileName: string): Promise<ImportPreview> {
+  const parts = await readParts(source);
 
   const slideNumbers = [...parts.keys()]
     .map((path) => SLIDE_PATH.exec(path)?.[1])

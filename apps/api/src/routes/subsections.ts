@@ -1,3 +1,5 @@
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -40,10 +42,12 @@ const reorderSchema = z.object({
     .min(1, 'Send at least one section'),
 });
 
-const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 25 * 1024 * 1024);
+const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES ?? 100 * 1024 * 1024);
 
 const upload = multer({
-  storage: multer.memoryStorage(),
+  // Streamed to disk so a large deck never sits in memory; the importer reads only
+  // the slide XML back out of the file, then the route deletes it.
+  storage: multer.diskStorage({ destination: tmpdir() }),
   limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
     const isPptx =
@@ -311,12 +315,16 @@ subSectionsRouter.post(
   '/:id/import',
   upload.single('file'),
   asyncHandler(async (req, res) => {
+    // Registered first so the temp file is removed on every exit path, errors included.
+    const tempPath = req.file?.path;
+    if (tempPath) res.on('close', () => void rm(tempPath, { force: true }));
+
     const playerId = await resolvePlayerId(req);
     const sub = await loadSubSectionOrThrow(req.params.id!);
 
     if (!req.file) throw HttpError.badRequest('Attach a .pptx file in the "file" field');
 
-    const preview = await parsePptx(req.file.buffer, req.file.originalname);
+    const preview = await parsePptx(req.file.path, req.file.originalname);
 
     if (req.query.preview === 'true') {
       res.json({ data: preview });

@@ -277,7 +277,7 @@ Per slide:
 | Speaker notes | Card **notes** (and the back, if the slide has no bullets) |
 | Slide number | `sourceSlide`, shown on the card |
 
-Slides with no text at all (image-only) are skipped. Upload is capped at 25 MB
+Slides with no text at all (image-only) are skipped. Upload is capped at 100 MB
 (`MAX_UPLOAD_BYTES`) and non-`.pptx` files are rejected with a `415`.
 
 In the UI: **Manage → Import** on any deck. The file is parsed and previewed
