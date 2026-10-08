@@ -1,54 +1,64 @@
 /* ==========================================================================
    QA Assessment — design tokens
-   A dark "arcade console" theme: deep indigo base, neon accents, chunky
-   rounded surfaces, and motion that rewards the learner for making progress.
+   A light, airy "sea & mint" theme. A pale mint canvas, big rounded white
+   cards, condensed uppercase display type with a brush-script accent, and a
+   mid-teal "sea" hero panel with soft clouds. Pill-shaped buttons and nav.
+   Inspired by Faith Ibiza and ViV on Awwwards.
    ========================================================================== */
 
 :root {
-  /* Surfaces, from deepest background to raised panel */
-  --bg-0: #0a0a14;
-  --bg-1: #10101f;
-  --bg-2: #171730;
-  --bg-3: #1f1f40;
-  --surface-border: rgba(255, 255, 255, 0.08);
-  --surface-border-strong: rgba(255, 255, 255, 0.16);
+  /* Surfaces, from page canvas to raised panel. Names are kept from the old
+     dark theme so every component keeps working; the values are all light now. */
+  --bg-0: #e3f0ed; /* page canvas (mint) */
+  --bg-1: #ffffff; /* inputs, modal body, white cards */
+  --bg-2: #f3f9f8; /* resting rows and tiles sitting on a white panel */
+  --bg-3: #dcebe8; /* hover, tracks, chips */
+  --card: #ffffff;
+  --surface-border: rgba(18, 51, 61, 0.1);
+  --surface-border-strong: rgba(18, 51, 61, 0.22);
 
-  /* Text */
-  --text-1: #f4f4ff;
-  --text-2: #b8b8d4;
-  --text-3: #7a7a9c;
+  /* Text — all pass AA on white and on the mint canvas */
+  --text-1: #12333d;
+  --text-2: #3b5d67;
+  --text-3: #4a6a74;
 
   /* Accents */
-  --accent: #7c3aed;
-  --accent-bright: #a855f7;
-  --accent-soft: rgba(124, 58, 237, 0.16);
-  --cyan: #22d3ee;
-  --lime: #a3e635;
-  --amber: #fbbf24;
-  --rose: #fb7185;
-  --emerald: #34d399;
+  --accent: #1f6f82; /* deep sea teal: buttons, links */
+  --accent-strong: #17586a; /* hover/pressed */
+  --accent-bright: #2f8fa5; /* focus rings, graphics, large display text */
+  --accent-soft: rgba(31, 111, 130, 0.12);
+  --aqua: #7fe3d3; /* highlight from the "Book with Faith" script */
+  --sea-ink: #17697c; /* teal for small labels on white (legacy name: --cyan) */
+  --cyan: var(--sea-ink);
+  --sand: #f6e7c8;
+  --amber: #f2b632; /* fills: stars, dots, glows */
+  --amber-ink: #8a5a00; /* text on light surfaces */
+  --rose: #bf3550;
+  --emerald: #0d7a57;
+  --lime: #6a9a1a;
 
   /* Semantic */
   --success: var(--emerald);
   --danger: var(--rose);
-  --warning: var(--amber);
+  --warning: var(--amber-ink);
 
-  /* Track colours */
-  --track-process: #22d3ee;
-  --track-technical: #fb7185;
+  /* Track colours (used for ring strokes) */
+  --track-process: #2f8fa5;
+  --track-technical: #e0707f;
 
-  --radius-sm: 8px;
-  --radius: 14px;
-  --radius-lg: 22px;
-  --radius-xl: 30px;
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.6);
-  --glow-accent: 0 0 24px rgba(168, 85, 247, 0.45);
+  --shadow-sm: 0 2px 10px rgba(18, 70, 85, 0.07);
+  --shadow: 0 12px 34px rgba(18, 70, 85, 0.14);
+  --shadow-lg: 0 24px 60px rgba(18, 70, 85, 0.2);
+  --glow-accent: 0 6px 20px rgba(47, 143, 165, 0.35);
 
-  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --font-display: 'Segoe UI', system-ui, sans-serif;
+  --font: 'DM Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', 'Segoe UI', system-ui, sans-serif;
+  --font-script: 'Yellowtail', 'Segoe Script', cursive;
   --font-mono: 'Cascadia Code', 'Consolas', monospace;
 
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -68,11 +78,12 @@ body {
   margin: 0;
   font-family: var(--font);
   color: var(--text-1);
-  background: var(--bg-0);
-  /* Two soft radial glows give the flat background some depth. */
+  background-color: var(--bg-0);
+  /* Soft light and sea glows give the flat mint canvas some depth. */
   background-image:
-    radial-gradient(ellipse 80% 60% at 15% -10%, rgba(124, 58, 237, 0.18), transparent),
-    radial-gradient(ellipse 70% 50% at 90% 0%, rgba(34, 211, 238, 0.12), transparent);
+    radial-gradient(ellipse 60% 40% at 88% -5%, rgba(255, 255, 255, 0.95), transparent),
+    radial-gradient(ellipse 50% 45% at 0% 100%, rgba(127, 227, 211, 0.4), transparent),
+    radial-gradient(ellipse 60% 50% at 100% 100%, rgba(47, 143, 165, 0.16), transparent);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
@@ -83,8 +94,8 @@ h3,
 h4 {
   font-family: var(--font-display);
   margin: 0;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
 }
 
 a {
@@ -100,9 +111,9 @@ button {
 
 /* Visible focus for keyboard users on every interactive surface. */
 :focus-visible {
-  outline: 2px solid var(--accent-bright);
+  outline: 3px solid var(--accent-bright);
   outline-offset: 3px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* ========================================================================== */
@@ -120,7 +131,7 @@ button {
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 28px 24px 80px;
+  padding: 36px 24px 96px;
 }
 
 .page-header {
@@ -129,19 +140,111 @@ button {
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
 .page-title {
-  font-size: 30px;
-  font-weight: 800;
+  font-size: clamp(36px, 5vw, 52px);
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.015em;
+}
+
+/* Brush-script flourish that sits under a display title, like "Book with Faith". */
+.page-title .script {
+  display: block;
+  margin-top: -0.06em;
+  margin-left: 0.3em;
+  font-family: var(--font-script);
+  font-size: 1.05em;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--accent-bright);
 }
 
 .page-subtitle {
   color: var(--text-2);
-  margin-top: 6px;
-  font-size: 15px;
+  margin-top: 10px;
+  font-size: 16px;
+  line-height: 1.55;
   max-width: 62ch;
+}
+
+/* The big teal "sea" panel at the top of the dashboard. */
+.page-header--hero {
+  position: relative;
+  overflow: hidden;
+  align-items: center;
+  padding: 48px 52px;
+  margin-bottom: 44px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, #25677b 0%, #2c7b90 50%, #4b9fb2 100%);
+  box-shadow: var(--shadow);
+  color: #fff;
+}
+
+.page-header--hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Two blurred clouds drifting in the corners. */
+.page-header--hero::before,
+.page-header--hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+
+.page-header--hero::before {
+  width: 440px;
+  height: 190px;
+  right: -60px;
+  top: -50px;
+  filter: blur(8px);
+}
+
+.page-header--hero::after {
+  width: 300px;
+  height: 140px;
+  left: 38%;
+  bottom: -60px;
+  opacity: 0.4;
+  filter: blur(10px);
+}
+
+.page-header--hero .page-title {
+  color: #fff;
+  font-size: clamp(42px, 6.5vw, 78px);
+}
+
+.page-header--hero .page-title .script {
+  color: #aef2e6;
+  text-shadow: 0 2px 18px rgba(0, 50, 70, 0.3);
+}
+
+.page-header--hero .page-subtitle {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* White pill that carries the overall progress on the hero. */
+.hero-chip {
+  padding: 14px 26px 14px 16px;
+  border-radius: 99px;
+  background: #fff;
+  color: var(--text-1);
+  box-shadow: var(--shadow);
+}
+
+.track-title {
+  font-size: clamp(28px, 3.4vw, 38px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .stack {
@@ -162,40 +265,48 @@ button {
 }
 
 /* ========================================================================== */
-/* Top bar / HUD                                                              */
+/* Top bar / HUD — a floating pill, like the MENU / BOOK pills on Faith       */
 /* ========================================================================== */
 
 .hud {
   position: sticky;
-  top: 0;
+  top: 12px;
   z-index: 50;
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 12px 24px;
-  background: rgba(10, 10, 20, 0.82);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--surface-border);
+  width: calc(100% - 32px);
+  max-width: 1180px;
+  margin: 12px auto 0;
+  padding: 10px 14px 10px 18px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .hud-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 800;
-  font-size: 17px;
-  letter-spacing: -0.02em;
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1;
+  color: var(--accent);
   white-space: nowrap;
 }
 
 .hud-brand-mark {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #bff3ea, var(--aqua));
   box-shadow: var(--glow-accent);
+  font-family: var(--font);
   font-size: 18px;
 }
 
@@ -205,22 +316,25 @@ button {
 }
 
 .hud-link {
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  border-radius: 99px;
   color: var(--text-2);
+  font-family: var(--font-display);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 17px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   transition: background 0.15s, color 0.15s;
 }
 
 .hud-link:hover {
-  background: var(--bg-2);
+  background: var(--bg-3);
   color: var(--text-1);
 }
 
 .hud-link.is-active {
-  background: var(--accent-soft);
-  color: var(--accent-bright);
+  background: var(--accent);
+  color: #fff;
 }
 
 .hud-stats {
@@ -243,12 +357,12 @@ button {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: conic-gradient(from 180deg, var(--accent), var(--cyan), var(--accent));
+  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
   font-weight: 800;
   font-size: 14px;
   color: #fff;
   box-shadow: var(--glow-accent);
-  border: 2px solid var(--bg-0);
+  border: 2px solid #fff;
 }
 
 .xp-bar {
@@ -274,7 +388,7 @@ button {
 .xp-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  background: linear-gradient(90deg, var(--accent-bright), var(--aqua));
   transition: width 0.6s var(--ease-bounce);
 }
 
@@ -282,10 +396,11 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 12px;
+  padding: 7px 13px;
   border-radius: 99px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.18), rgba(251, 113, 133, 0.14));
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: var(--sand);
+  border: 1px solid rgba(242, 182, 50, 0.5);
+  color: #6b4500;
   font-weight: 700;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -296,17 +411,17 @@ button {
 /* ========================================================================== */
 
 .panel {
-  background: linear-gradient(160deg, var(--bg-2), var(--bg-1));
+  background: var(--card);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-lg);
-  padding: 22px;
+  padding: 26px;
   box-shadow: var(--shadow-sm);
 }
 
 .tile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 18px;
+  gap: 22px;
 }
 
 /* A section tile on the dashboard */
@@ -314,11 +429,12 @@ button {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 20px;
+  gap: 16px;
+  padding: 24px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--bg-2), #4040ff);
+  background: var(--card);
   border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
   cursor: pointer;
   text-align: left;
@@ -330,20 +446,20 @@ button {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 100% 0%, var(--tile-accent, var(--accent)), transparent 65%);
-  opacity: 0.14;
+  background: radial-gradient(circle at 100% 0%, var(--tile-accent, var(--accent)), transparent 62%);
+  opacity: 0.16;
   pointer-events: none;
   transition: opacity 0.2s;
 }
 
 .tile:hover {
-  transform: translateY(-4px);
+  transform: translateY(-5px);
   border-color: var(--surface-border-strong);
   box-shadow: var(--shadow);
 }
 
 .tile:hover::before {
-  opacity: 0.24;
+  opacity: 0.28;
 }
 
 .tile-head {
@@ -355,27 +471,30 @@ button {
 .tile-icon {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   flex-shrink: 0;
   border-radius: var(--radius);
-  background: var(--bg-3);
+  background: var(--bg-2);
   border: 1px solid var(--surface-border);
-  font-size: 24px;
+  font-size: 26px;
 }
 
 .tile-name {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   /* Matches .deck-row-name so section and deck titles read as one family. */
-  color: var(--cyan);
+  color: var(--sea-ink);
 }
 
 .tile-desc {
   color: var(--text-2);
   font-size: 14px;
   line-height: 1.5;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .tile-meta {
@@ -392,11 +511,11 @@ button {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   border-radius: var(--radius);
   background: var(--bg-2);
   border: 1px solid var(--surface-border);
-  /* Set explicitly so the row never inherits a dark colour from a parent. */
+  /* Set explicitly so the row never inherits a stray colour from a parent. */
   color: var(--text-1);
   transition: transform 0.16s var(--ease-bounce), border-color 0.16s, background 0.16s;
 }
@@ -415,8 +534,8 @@ button {
 .deck-row-name {
   font-weight: 700;
   font-size: 16px;
-  /* Cyan reads as a "this is the deck" label and clears AA on --bg-2/--bg-3. */
-  color: var(--cyan);
+  /* Deep teal reads as a "this is the deck" label and clears AA on every surface. */
+  color: var(--sea-ink);
 }
 
 .deck-row-meta {
@@ -433,38 +552,38 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 11px;
+  padding: 4px 12px;
   border-radius: 99px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   background: var(--bg-3);
   border: 1px solid var(--surface-border);
   color: var(--text-2);
 }
 
 .pill--process {
-  background: rgba(34, 211, 238, 0.14);
-  border-color: rgba(34, 211, 238, 0.32);
-  color: var(--track-process);
+  background: rgba(47, 143, 165, 0.12);
+  border-color: rgba(47, 143, 165, 0.35);
+  color: var(--sea-ink);
 }
 
 .pill--technical {
-  background: rgba(251, 113, 133, 0.14);
-  border-color: rgba(251, 113, 133, 0.32);
-  color: var(--track-technical);
+  background: rgba(224, 112, 127, 0.12);
+  border-color: rgba(224, 112, 127, 0.4);
+  color: var(--rose);
 }
 
 .pill--known {
-  background: rgba(52, 211, 153, 0.14);
-  border-color: rgba(52, 211, 153, 0.32);
+  background: rgba(13, 122, 87, 0.1);
+  border-color: rgba(13, 122, 87, 0.35);
   color: var(--emerald);
 }
 
 .pill--learning {
-  background: rgba(251, 191, 36, 0.14);
-  border-color: rgba(251, 191, 36, 0.32);
-  color: var(--amber);
+  background: rgba(242, 182, 50, 0.18);
+  border-color: rgba(242, 182, 50, 0.55);
+  color: var(--amber-ink);
 }
 
 .pill--new {
@@ -477,7 +596,7 @@ button {
 }
 
 .difficulty-MEDIUM {
-  color: var(--amber);
+  color: var(--amber-ink);
 }
 
 .difficulty-HARD {
@@ -488,7 +607,7 @@ button {
 .badge-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+  gap: 14px;
 }
 
 .badge {
@@ -496,17 +615,18 @@ button {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 16px 12px;
+  padding: 18px 12px;
   border-radius: var(--radius);
-  background: var(--bg-2);
+  background: var(--card);
   border: 1px solid var(--surface-border);
+  box-shadow: var(--shadow-sm);
   text-align: center;
   transition: transform 0.2s var(--ease-bounce);
 }
 
 .badge.is-earned {
-  border-color: rgba(251, 191, 36, 0.4);
-  background: linear-gradient(160deg, rgba(251, 191, 36, 0.12), var(--bg-2));
+  border-color: rgba(242, 182, 50, 0.6);
+  background: linear-gradient(160deg, rgba(242, 182, 50, 0.18), var(--card));
 }
 
 .badge.is-earned:hover {
@@ -515,8 +635,10 @@ button {
 
 /* Locked badges are desaturated rather than hidden, so goals stay visible. */
 .badge.is-locked {
-  opacity: 0.42;
+  opacity: 0.55;
   filter: grayscale(1);
+  background: var(--bg-2);
+  box-shadow: none;
 }
 
 .badge-icon {
@@ -536,7 +658,7 @@ button {
 }
 
 /* ========================================================================== */
-/* Buttons                                                                    */
+/* Buttons — pills with condensed uppercase labels                            */
 /* ========================================================================== */
 
 .btn {
@@ -544,21 +666,26 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 11px 20px;
-  border-radius: var(--radius);
-  border: 1px solid var(--surface-border);
-  background: var(--bg-3);
+  padding: 11px 24px;
+  border-radius: 99px;
+  border: 1px solid var(--surface-border-strong);
+  background: #fff;
   color: var(--text-1);
-  font-size: 14px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
-  transition: transform 0.14s var(--ease-bounce), background 0.16s, box-shadow 0.16s, opacity 0.16s;
+  transition: transform 0.14s var(--ease-bounce), background 0.16s, box-shadow 0.16s, opacity 0.16s,
+    border-color 0.16s;
   white-space: nowrap;
 }
 
 .btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  background: #2a2a55;
+  background: var(--accent-soft);
+  border-color: var(--accent-bright);
 }
 
 .btn:active:not(:disabled) {
@@ -571,44 +698,54 @@ button {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, var(--accent), var(--accent-bright));
+  background: var(--accent);
   border-color: transparent;
-  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.4);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(31, 111, 130, 0.32);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--accent-bright), #c084fc);
-  box-shadow: 0 8px 26px rgba(168, 85, 247, 0.55);
+  background: var(--accent-strong);
+  border-color: transparent;
+  box-shadow: 0 10px 26px rgba(31, 111, 130, 0.42);
 }
 
 .btn--success {
-  background: linear-gradient(135deg, #059669, var(--emerald));
+  background: var(--emerald);
   border-color: transparent;
-  color: #04241a;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(13, 122, 87, 0.28);
+}
+
+.btn--success:hover:not(:disabled) {
+  background: #0a6447;
+  border-color: transparent;
 }
 
 .btn--danger {
-  background: rgba(251, 113, 133, 0.16);
-  border-color: rgba(251, 113, 133, 0.4);
+  background: rgba(191, 53, 80, 0.08);
+  border-color: rgba(191, 53, 80, 0.4);
   color: var(--rose);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: rgba(251, 113, 133, 0.28);
+  background: rgba(191, 53, 80, 0.16);
+  border-color: var(--rose);
 }
 
 .btn--ghost {
   background: transparent;
+  border-color: var(--surface-border);
 }
 
 .btn--sm {
-  padding: 7px 13px;
-  font-size: 13px;
+  padding: 6px 16px;
+  font-size: 15px;
 }
 
 .btn--lg {
-  padding: 15px 30px;
-  font-size: 16px;
+  padding: 15px 34px;
+  font-size: 20px;
 }
 
 .btn--block {
@@ -645,9 +782,9 @@ button {
   inset: 0;
   display: flex;
   flex-direction: column;
-  padding: 38px 40px;
+  padding: 44px 48px;
   border-radius: var(--radius-xl);
-  border: 1px solid var(--surface-border-strong);
+  border: 1px solid var(--surface-border);
   /* Hiding the reverse of each face is what prevents mirrored text. */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -655,17 +792,22 @@ button {
   overflow-y: auto;
 }
 
+/* Front: a white card with a mint wash and a hint of sea in the corner. */
 .flashcard-face--front {
   background:
-    radial-gradient(circle at 20% 0%, rgba(124, 58, 237, 0.24), transparent 60%),
-    linear-gradient(160deg, var(--bg-3), var(--bg-1));
+    radial-gradient(circle at 12% 0%, rgba(127, 227, 211, 0.4), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(47, 143, 165, 0.14), transparent 55%),
+    #fff;
 }
 
+/* Back: the mid-teal "sea" from the hero, with white type. */
 .flashcard-face--back {
   transform: rotateY(180deg);
+  border-color: transparent;
+  color: #fff;
   background:
-    radial-gradient(circle at 80% 0%, rgba(34, 211, 238, 0.2), transparent 60%),
-    linear-gradient(160deg, #16233a, var(--bg-1));
+    radial-gradient(circle at 85% 0%, rgba(255, 255, 255, 0.28), transparent 50%),
+    linear-gradient(160deg, #20697c, #2b7f93);
 }
 
 .flashcard-kicker {
@@ -674,23 +816,33 @@ button {
   gap: 10px;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+}
+
+.flashcard-face--back .flashcard-kicker {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .flashcard-title {
-  font-size: 27px;
-  font-weight: 800;
-  line-height: 1.28;
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
 }
 
 .flashcard-body {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.65;
   color: var(--text-2);
   margin-top: 16px;
+}
+
+.flashcard-face--back .flashcard-body {
+  color: #fff;
 }
 
 .flashcard-bullets {
@@ -710,12 +862,20 @@ button {
   color: var(--text-1);
 }
 
+.flashcard-face--back .flashcard-bullets li {
+  color: #fff;
+}
+
 .flashcard-bullets li::before {
   content: '▸';
   position: absolute;
   left: 8px;
-  color: var(--cyan);
+  color: var(--accent-bright);
   font-size: 15px;
+}
+
+.flashcard-face--back .flashcard-bullets li::before {
+  color: #aef2e6;
 }
 
 .flashcard-notes {
@@ -726,6 +886,11 @@ button {
   color: var(--text-3);
   line-height: 1.55;
   font-style: italic;
+}
+
+.flashcard-face--back .flashcard-notes {
+  border-top-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .flashcard-hint {
@@ -744,7 +909,7 @@ button {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin-top: 26px;
+  margin-top: 28px;
   flex-wrap: wrap;
 }
 
@@ -760,16 +925,16 @@ button {
 .deck-dots {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  margin-top: 18px;
+  gap: 7px;
+  margin-top: 22px;
   flex-wrap: wrap;
 }
 
 .deck-dot {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: var(--bg-3);
+  background: rgba(18, 51, 61, 0.2);
   border: none;
   padding: 0;
   cursor: pointer;
@@ -781,8 +946,8 @@ button {
 }
 
 .deck-dot.is-current {
-  background: var(--accent-bright);
-  transform: scale(1.45);
+  background: var(--accent);
+  transform: scale(1.5);
 }
 
 .deck-dot.is-known {
@@ -836,7 +1001,7 @@ button {
 .progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  background: linear-gradient(90deg, var(--accent-bright), var(--aqua));
   transition: width 0.6s var(--ease-bounce);
 }
 
@@ -857,16 +1022,16 @@ button {
 }
 
 .quiz-question {
-  font-size: 23px;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 700;
   line-height: 1.35;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
 }
 
 .quiz-options {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
 }
 
 .quiz-option {
@@ -874,9 +1039,9 @@ button {
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding: 16px 18px;
+  padding: 16px 20px;
   border-radius: var(--radius);
-  background: var(--bg-2);
+  background: #fff;
   border: 2px solid var(--surface-border);
   color: var(--text-1);
   font-size: 15px;
@@ -888,8 +1053,8 @@ button {
 
 .quiz-option:hover:not(:disabled) {
   transform: translateX(5px);
-  border-color: var(--accent);
-  background: var(--bg-3);
+  border-color: var(--accent-bright);
+  background: var(--bg-2);
 }
 
 .quiz-option:disabled {
@@ -897,27 +1062,27 @@ button {
 }
 
 .quiz-option.is-selected {
-  border-color: var(--accent-bright);
+  border-color: var(--accent);
   background: var(--accent-soft);
 }
 
 .quiz-option.is-correct {
   border-color: var(--emerald);
-  background: rgba(52, 211, 153, 0.14);
+  background: rgba(13, 122, 87, 0.1);
 }
 
 .quiz-option.is-wrong {
   border-color: var(--rose);
-  background: rgba(251, 113, 133, 0.14);
+  background: rgba(191, 53, 80, 0.08);
 }
 
 .quiz-option-key {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--bg-3);
   font-weight: 800;
   font-size: 13px;
@@ -925,10 +1090,10 @@ button {
 
 .quiz-explanation {
   margin-top: 18px;
-  padding: 16px 18px;
+  padding: 16px 20px;
   border-radius: var(--radius);
-  background: rgba(34, 211, 238, 0.08);
-  border-left: 3px solid var(--cyan);
+  background: rgba(47, 143, 165, 0.1);
+  border-left: 4px solid var(--accent-bright);
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-2);
@@ -941,10 +1106,11 @@ button {
 }
 
 .result-score {
-  font-size: 62px;
-  font-weight: 900;
+  font-family: var(--font-display);
+  font-size: 96px;
+  font-weight: 600;
   line-height: 1;
-  background: linear-gradient(135deg, var(--accent-bright), var(--cyan));
+  background: linear-gradient(135deg, var(--accent), #3aa8bd);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -960,15 +1126,16 @@ button {
 }
 
 .star {
-  opacity: 0.22;
+  opacity: 0.25;
+  filter: grayscale(1);
   transform: scale(0.85);
   transition: opacity 0.3s, transform 0.4s var(--ease-bounce);
 }
 
 .star.is-lit {
   opacity: 1;
+  filter: drop-shadow(0 2px 8px rgba(242, 182, 50, 0.7));
   transform: scale(1);
-  filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.7));
 }
 
 /* ========================================================================== */
@@ -991,10 +1158,10 @@ button {
 .textarea,
 .select {
   width: 100%;
-  padding: 11px 14px;
+  padding: 12px 16px;
   border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  border: 1px solid var(--surface-border);
+  background: #fff;
+  border: 1px solid var(--surface-border-strong);
   color: var(--text-1);
   font-family: inherit;
   font-size: 14px;
@@ -1006,7 +1173,7 @@ button {
 .select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 .textarea {
@@ -1035,7 +1202,7 @@ button {
   padding: 38px 24px;
   border-radius: var(--radius-lg);
   border: 2px dashed var(--surface-border-strong);
-  background: var(--bg-1);
+  background: var(--bg-2);
   text-align: center;
   cursor: pointer;
   transition: border-color 0.18s, background 0.18s;
@@ -1113,7 +1280,7 @@ button {
 /* A section that a dragged deck would land in. */
 .panel.is-drop-into {
   border-color: var(--accent-bright);
-  background: linear-gradient(160deg, var(--accent-soft), var(--bg-1));
+  background: linear-gradient(160deg, var(--accent-soft), #fff);
 }
 
 /* ========================================================================== */
@@ -1127,7 +1294,7 @@ button {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(5, 5, 12, 0.72);
+  background: rgba(18, 51, 61, 0.38);
   backdrop-filter: blur(6px);
   animation: fade-in 0.18s ease;
 }
@@ -1137,17 +1304,19 @@ button {
   max-width: 560px;
   max-height: 88vh;
   overflow-y: auto;
-  padding: 26px;
+  padding: 30px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, var(--bg-2), var(--bg-1));
-  border: 1px solid var(--surface-border-strong);
+  background: #fff;
+  border: 1px solid var(--surface-border);
   box-shadow: var(--shadow-lg);
   animation: pop-in 0.26s var(--ease-bounce);
 }
 
 .modal-title {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 32px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   margin-bottom: 6px;
 }
 
@@ -1162,7 +1331,7 @@ button {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 24px;
+  margin-top: 26px;
 }
 
 /* ========================================================================== */
@@ -1184,27 +1353,27 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 14px 22px;
   border-radius: var(--radius);
-  background: linear-gradient(135deg, var(--bg-3), var(--bg-2));
-  border: 1px solid var(--surface-border-strong);
+  background: #fff;
+  border: 1px solid var(--surface-border);
   box-shadow: var(--shadow);
   animation: slide-in 0.32s var(--ease-bounce);
   min-width: 240px;
 }
 
 .toast--xp {
-  border-color: rgba(168, 85, 247, 0.5);
-  box-shadow: var(--glow-accent);
+  border-color: var(--accent-bright);
+  box-shadow: var(--shadow), 0 0 0 3px rgba(127, 227, 211, 0.45);
 }
 
 .toast--badge {
-  border-color: rgba(251, 191, 36, 0.55);
-  box-shadow: 0 0 26px rgba(251, 191, 36, 0.35);
+  border-color: var(--amber);
+  box-shadow: var(--shadow), 0 0 0 3px rgba(242, 182, 50, 0.3);
 }
 
 .toast--error {
-  border-color: rgba(251, 113, 133, 0.55);
+  border-color: var(--rose);
 }
 
 .toast-icon {
@@ -1238,7 +1407,7 @@ button {
 
 .empty-icon {
   font-size: 46px;
-  opacity: 0.6;
+  opacity: 0.7;
 }
 
 .empty-title {
@@ -1259,16 +1428,16 @@ button {
   height: 34px;
   border-radius: 50%;
   border: 3px solid var(--bg-3);
-  border-top-color: var(--accent-bright);
+  border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
 
 .error-banner {
-  padding: 14px 18px;
+  padding: 14px 20px;
   border-radius: var(--radius);
-  background: rgba(251, 113, 133, 0.12);
-  border: 1px solid rgba(251, 113, 133, 0.34);
-  color: #ffc2cb;
+  background: rgba(191, 53, 80, 0.08);
+  border: 1px solid rgba(191, 53, 80, 0.35);
+  color: #8e1f35;
   font-size: 14px;
   margin-bottom: 18px;
 }
@@ -1307,11 +1476,11 @@ button {
 
   0%,
   100% {
-    box-shadow: 0 0 18px rgba(168, 85, 247, 0.35);
+    box-shadow: 0 0 18px rgba(47, 143, 165, 0.3);
   }
 
   50% {
-    box-shadow: 0 0 34px rgba(168, 85, 247, 0.65);
+    box-shadow: 0 0 34px rgba(47, 143, 165, 0.55);
   }
 }
 
@@ -1324,6 +1493,11 @@ button {
     flex-wrap: wrap;
     gap: 12px;
     padding: 12px 16px;
+    border-radius: var(--radius-lg);
+  }
+
+  .hud-nav {
+    flex-wrap: wrap;
   }
 
   .hud-stats {
@@ -1338,19 +1512,24 @@ button {
   }
 
   .page {
-    padding: 20px 16px 64px;
+    padding: 24px 16px 64px;
+  }
+
+  .page-header--hero {
+    padding: 32px 24px;
+    border-radius: var(--radius-lg);
   }
 
   .flashcard-face {
-    padding: 26px 22px;
+    padding: 28px 24px;
   }
 
   .flashcard-title {
-    font-size: 22px;
+    font-size: 28px;
   }
 
   .result-score {
-    font-size: 46px;
+    font-size: 72px;
   }
 }
 
@@ -1383,10 +1562,13 @@ button {
 
 .auth-panel {
   width: 100%;
-  max-width: 400px;
+  max-width: 440px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding: 36px;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow);
 }
 
 .auth-field {
@@ -1401,9 +1583,9 @@ button {
 .auth-error {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(251, 113, 133, 0.12);
-  border: 1px solid rgba(251, 113, 133, 0.34);
-  color: #ffc2cb;
+  background: rgba(191, 53, 80, 0.08);
+  border: 1px solid rgba(191, 53, 80, 0.35);
+  color: #8e1f35;
   font-size: 13px;
   margin: 0;
 }
@@ -1416,8 +1598,10 @@ button {
 }
 
 .auth-switch a {
-  color: var(--accent-bright);
+  color: var(--accent);
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* ========================================================================== */
@@ -1427,26 +1611,28 @@ button {
 .leaderboard-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .leaderboard-row {
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 16px 20px;
+  padding: 16px 24px;
+  border-radius: 99px;
 }
 
 .leaderboard-row.is-you {
-  border-color: rgba(168, 85, 247, 0.5);
-  background: linear-gradient(160deg, var(--accent-soft), var(--bg-1));
+  border-color: var(--accent-bright);
+  background: linear-gradient(90deg, rgba(127, 227, 211, 0.3), #fff 70%);
 }
 
 .leaderboard-rank {
   flex-shrink: 0;
   width: 40px;
-  font-size: 20px;
-  font-weight: 800;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
   text-align: center;
   color: var(--text-2);
 }
@@ -1460,7 +1646,7 @@ button {
 }
 
 .leaderboard-you-tag {
-  color: var(--accent-bright);
+  color: var(--accent);
   font-weight: 700;
 }
 
@@ -1477,8 +1663,9 @@ button {
   flex-shrink: 0;
   min-width: 90px;
   text-align: right;
-  font-weight: 800;
-  font-size: 16px;
-  color: var(--cyan);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 26px;
+  color: var(--sea-ink);
   font-variant-numeric: tabular-nums;
 }

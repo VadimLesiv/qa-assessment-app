@@ -1,9 +1,35 @@
 ---
 name: start-application
-description: Start the QA Assessment app's API and web client locally. Use when asked to run, start, launch, or serve the app, or to check a UI/CSS/API change in the browser.
+description: Run or check the QA Assessment app. The app is deployed (Render API + Netlify web), so verify the server first; start the API and web client locally only for dev work or uncommitted changes. Use when asked to run, start, launch, or serve the app, or to check a UI/CSS/API change in the browser.
 ---
 
 # Start Application
+
+## First: the app is already deployed
+
+The app runs on a server, so **don't start a local copy unless the user asks
+for local/dev mode or needs to test uncommitted changes**:
+
+- **API** (Render, free tier): `https://qa-assessment-api.onrender.com`
+- **Web** (Netlify): `https://resilient-treacle-8b3b9e.netlify.app`. Netlify
+  proxies `/api/*` to the Render API.
+
+Free-tier Render services sleep when idle, so the first request can take
+30–60 s. Check it's up:
+
+```bash
+curl -s -i --max-time 90 https://qa-assessment-api.onrender.com/api/health
+```
+
+Expect `200` with `{"status":"ok", ...}`. If it fails, use the
+`render:check-render-status` / `render:render-debug` skills. Changes only reach
+the server after pushing to `main` (Render and Netlify auto-deploy); the Render
+build also runs `prisma db push` against the production DB.
+
+Never run `db:seed`, `db:push` or `db:reset` against the production
+`DATABASE_URL`.
+
+## Local development (only when requested)
 
 This is a Node.js/TypeScript npm workspaces monorepo, **not** a single build:
 

@@ -63,16 +63,18 @@ export function DashboardPage() {
 
   return (
     <main className="page">
-      <div className="page-header">
+      <div className="page-header page-header--hero">
         <div>
-          <h1 className="page-title">Your QA training ground</h1>
+          <h1 className="page-title">
+            Your QA <span className="script">training ground</span>
+          </h1>
           <p className="page-subtitle">
             Flip through decks to learn, then prove it in a quiz. Every card you master and every question
             you answer earns XP toward your next level.
           </p>
         </div>
 
-        <div className="row" style={{ gap: 24 }}>
+        <div className="hero-chip">
           <div className="row" style={{ gap: 10 }}>
             <ProgressRing percent={progress.overall.percent} size={68} stroke={7} label="Overall progress" />
             <div>
@@ -92,7 +94,7 @@ export function DashboardPage() {
         return (
           <section key={track.key} style={{ marginBottom: 40 }}>
             <div className="row" style={{ marginBottom: 16 }}>
-              <h2 style={{ fontSize: 21, fontWeight: 800 }}>
+              <h2 className="track-title">
                 <span aria-hidden="true" style={{ marginRight: 8 }}>
                   {track.icon}
                 </span>
