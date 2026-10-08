@@ -23,7 +23,7 @@ type DropHint =
   | { kind: 'section'; index: number }
   | { kind: 'deck'; sectionId: string; index: number };
 
-const ACCENTS = ['#7c3aed', '#22d3ee', '#fb7185', '#34d399', '#fbbf24', '#f472b6', '#60a5fa'];
+const ACCENTS = ['#2f8fa5', '#4fc3b0', '#f08a7a', '#e0a526', '#6aa8d8', '#9b8bd6', '#5bb98c'];
 const ICONS = ['📘', '🧭', '📋', '🔄', '🎯', '🤖', '🔌', '🧪', '🧠', '🚀', '🛡️', '⚙️'];
 
 const emptySection = (): SectionDraft => ({
@@ -31,7 +31,7 @@ const emptySection = (): SectionDraft => ({
   track: 'PROCESS',
   description: '',
   icon: '📘',
-  accent: '#7c3aed',
+  accent: '#2f8fa5',
 });
 
 export function ManagePage() {
@@ -334,7 +334,7 @@ export function ManagePage() {
                         track: section.track,
                         description: section.description ?? '',
                         icon: section.icon ?? '📘',
-                        accent: section.accent ?? '#7c3aed',
+                        accent: section.accent ?? '#2f8fa5',
                       })
                     }
                   >

@@ -134,7 +134,7 @@ export function ProfilePage() {
             <span className="badge-name">{badge.name}</span>
             <span className="badge-desc">{badge.description}</span>
             {badge.earnedAt && (
-              <span className="badge-desc" style={{ color: 'var(--amber)' }}>
+              <span className="badge-desc" style={{ color: 'var(--amber-ink)' }}>
                 {new Date(badge.earnedAt).toLocaleDateString()}
               </span>
             )}

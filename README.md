@@ -160,8 +160,9 @@ the signed-in player automatically. The one pre-account `Player` row a
 fresh clone seeds via manual use is claimed by whoever registers first,
 rather than being stranded.
 
-SQLite has no array type, so card bullets and quiz options are stored as JSON
-strings and parsed in one serializer layer.
+The database is PostgreSQL (e.g. a free Neon or Supabase project). Card bullets
+and quiz options are still stored as JSON strings rather than native arrays, and
+parsed in one serializer layer.
 
 ---
 
