@@ -6,6 +6,7 @@ import { plural } from '../lib/format';
 import { moveCard, moveDeck, moveSection } from '../lib/reorder';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Empty, ErrorBanner, Loading } from '../components/States';
+import { useCelebration } from '../components/Celebration';
 import { useToast } from '../components/Toast';
 
 type SectionDraft = { id?: string; name: string; track: SectionTrack; description: string; icon: string; accent: string };
@@ -933,6 +934,7 @@ function ImportModal({
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const celebrate = useCelebration();
 
   /** Parse first and show the user what will be created before writing anything. */
   const choose = async (selected: File) => {
@@ -955,7 +957,7 @@ function ImportModal({
     try {
       const result = await api.commitImport(deck.id, file);
       toast.info(`Imported ${result.imported} cards`, `from ${result.slideCount} slides`);
-      toast.badges(result.newBadges);
+      celebrate.badges(result.newBadges);
       await onDone();
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : 'Import failed');

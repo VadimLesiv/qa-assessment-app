@@ -4,6 +4,7 @@ import type { Card, CardStatus, ProgressSummary, SubSection } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { ProgressRing } from '../components/ProgressRing';
 import { Empty, ErrorBanner, Loading } from '../components/States';
+import { useCelebration } from '../components/Celebration';
 import { useToast } from '../components/Toast';
 import { usePlayer } from '../lib/PlayerContext';
 
@@ -20,6 +21,7 @@ export function StudyPage() {
   const [saving, setSaving] = useState(false);
 
   const toast = useToast();
+  const celebrate = useCelebration();
   const { setProfile } = usePlayer();
   const navigate = useNavigate();
 
@@ -61,7 +63,7 @@ export function StudyPage() {
         setProgress(result.deckProgress);
         setProfile(result.profile);
         toast.xp(result.xpEarned, status === 'KNOWN' ? 'Card mastered' : undefined);
-        toast.badges(result.newBadges);
+        celebrate.badges(result.newBadges);
 
         if (advance && index < cards.length - 1) {
           setFlipped(false);
@@ -73,7 +75,7 @@ export function StudyPage() {
         setSaving(false);
       }
     },
-    [current, saving, flipped, index, cards.length, setProfile, toast],
+    [current, saving, flipped, index, cards.length, setProfile, toast, celebrate],
   );
 
   const go = useCallback(
