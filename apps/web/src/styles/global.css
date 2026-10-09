@@ -1334,6 +1334,25 @@ button {
   margin-top: 26px;
 }
 
+.celebration {
+  text-align: center;
+}
+
+.celebration-icon {
+  font-size: 64px;
+  line-height: 1;
+  margin: 8px 0 16px;
+}
+
+.celebration .modal-desc {
+  margin-bottom: 10px;
+}
+
+.celebration + .modal-actions,
+.modal-actions:has(.btn--primary[autofocus]) {
+  justify-content: center;
+}
+
 /* ========================================================================== */
 /* Toasts (XP gains, badge unlocks)                                           */
 /* ========================================================================== */

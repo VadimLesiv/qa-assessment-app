@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Badge } from '@qa/shared';
 
 type ToastKind = 'xp' | 'badge' | 'error' | 'info';
 
@@ -14,7 +13,6 @@ interface Toast {
 interface ToastApi {
   /** Celebrates an XP gain. Silently ignores zero so callers need no guard. */
   xp: (amount: number, reason?: string) => void;
-  badges: (badges: Badge[]) => void;
   error: (message: string) => void;
   info: (title: string, text?: string) => void;
 }
@@ -40,11 +38,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       xp: (amount, reason) => {
         if (amount <= 0) return;
         push({ kind: 'xp', icon: '⚡', title: `+${amount} XP`, ...(reason ? { text: reason } : {}) });
-      },
-      badges: (badges) => {
-        for (const badge of badges) {
-          push({ kind: 'badge', icon: badge.icon, title: `Badge unlocked: ${badge.name}`, text: badge.description });
-        }
       },
       error: (message) => push({ kind: 'error', icon: '⚠️', title: 'Something went wrong', text: message }),
       info: (title, text) => push({ kind: 'info', icon: 'ℹ️', title, ...(text ? { text } : {}) }),

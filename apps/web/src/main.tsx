@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App';
+import { CelebrationProvider } from './components/Celebration';
 import { ToastProvider } from './components/Toast';
 import { PlayerProvider } from './lib/PlayerContext';
 import './styles/global.css';
@@ -13,9 +14,11 @@ createRoot(container).render(
   <StrictMode>
     <BrowserRouter>
       <ToastProvider>
-        <PlayerProvider>
-          <App />
-        </PlayerProvider>
+        <CelebrationProvider>
+          <PlayerProvider>
+            <App />
+          </PlayerProvider>
+        </CelebrationProvider>
       </ToastProvider>
     </BrowserRouter>
   </StrictMode>,

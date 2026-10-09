@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { QuizQuestion, QuizResult } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { Empty, ErrorBanner, Loading } from '../components/States';
+import { useCelebration } from '../components/Celebration';
 import { useToast } from '../components/Toast';
 import { usePlayer } from '../lib/PlayerContext';
 
@@ -20,6 +21,7 @@ export function QuizPage() {
   // Wall-clock duration is reported with the attempt for the results screen.
   const startedAt = useRef(Date.now());
   const toast = useToast();
+  const celebrate = useCelebration();
   const { setProfile } = usePlayer();
   const navigate = useNavigate();
 
@@ -68,7 +70,8 @@ export function QuizPage() {
       setResult(data);
       setProfile(data.profile);
       toast.xp(data.attempt.xpEarned, `${data.attempt.score}/${data.attempt.total} correct`);
-      toast.badges(data.newBadges);
+      celebrate.stars(data.attempt.stars, data.attempt.score, data.attempt.total);
+      celebrate.badges(data.newBadges);
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : 'Could not submit your answers');
     } finally {
