@@ -113,7 +113,13 @@ export function RichTextEditor({ value, onChange, placeholder, autoFocus, label 
   }, [refreshActive]);
 
   const restoreSelection = () => {
-    editorRef.current?.focus();
+    const el = editorRef.current;
+    if (!el) return;
+    // Keyboard actions happen with the caret already in the editor; the saved
+    // range can be stale (selectionchange lags behind typing), so keep the live one.
+    const live = window.getSelection();
+    if (document.activeElement === el && live?.anchorNode && el.contains(live.anchorNode)) return;
+    el.focus();
     const range = savedRange.current;
     if (range) {
       const sel = window.getSelection();
@@ -242,6 +248,15 @@ export function RichTextEditor({ value, onChange, placeholder, autoFocus, label 
         data-placeholder={placeholder}
         onInput={emit}
         onBlur={emit}
+        onKeyDown={(e) => {
+          if (e.key !== 'Tab') return;
+          const anchor = window.getSelection()?.anchorNode;
+          const inList = !!anchor && !!(anchor.nodeType === Node.ELEMENT_NODE ? (anchor as Element) : anchor.parentElement)?.closest('li');
+          // Outside a list Tab keeps its normal job of moving focus.
+          if (!inList) return;
+          e.preventDefault();
+          exec(e.shiftKey ? 'outdent' : 'indent');
+        }}
         onPaste={(e) => {
           // Paste as plain text so foreign styling never leaks into a card.
           e.preventDefault();

@@ -1829,3 +1829,29 @@ button {
   color: var(--text-3);
   pointer-events: none;
 }
+
+/* Sub-lists created with Tab */
+.rich-content ul ul {
+  list-style: circle;
+}
+
+.rich-content ul ul ul {
+  list-style: square;
+}
+
+.rich-content ol ol {
+  list-style: lower-alpha;
+}
+
+.rich-content ol ol ol {
+  list-style: lower-roman;
+}
+
+.rich-content li > ul,
+.rich-content li > ol,
+.rich-content ul > ul,
+.rich-content ul > ol,
+.rich-content ol > ul,
+.rich-content ol > ol {
+  margin: 2px 0;
+}
