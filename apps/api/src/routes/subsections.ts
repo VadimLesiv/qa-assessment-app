@@ -251,8 +251,8 @@ subSectionsRouter.delete(
 /* ------------------------------------------------------------------ */
 
 const createCardSchema = z.object({
-  front: z.string().trim().min(1, 'Front text is required').max(500),
-  back: z.string().trim().min(1, 'Back text is required').max(5000),
+  front: z.string().trim().min(1, 'Front text is required').max(20000),
+  back: z.string().trim().min(1, 'Back text is required').max(300000),
   notes: z.string().trim().max(5000).nullish(),
   bullets: z.array(z.string().trim().max(500)).max(20).optional(),
 });

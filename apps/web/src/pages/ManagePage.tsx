@@ -6,12 +6,14 @@ import { plural } from '../lib/format';
 import { moveCard, moveDeck, moveSection } from '../lib/reorder';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Empty, ErrorBanner, Loading } from '../components/States';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { hasContent, htmlToText, sanitizeHtml, toHtml } from '../lib/richtext';
 import { useCelebration } from '../components/Celebration';
 import { useToast } from '../components/Toast';
 
 type SectionDraft = { id?: string; name: string; track: SectionTrack; description: string; icon: string; accent: string };
 type DeckDraft = { id?: string; sectionId: string; name: string; description: string };
-type CardDraft = { id?: string; front: string; back: string; bullets: string; notes: string };
+type CardDraft = { id?: string; front: string; back: string; hadBullets?: boolean };
 
 /** What the user picked up. Decks remember their origin so a move can be named. */
 type Drag =
@@ -479,7 +481,7 @@ export function ManagePage() {
             <button
               type="button"
               className="btn btn--primary btn--sm"
-              onClick={() => setCardDraft({ front: '', back: '', bullets: '', notes: '' })}
+              onClick={() => setCardDraft({ front: '', back: '' })}
             >
               ＋ Add card
             </button>
@@ -504,7 +506,7 @@ export function ManagePage() {
                 <div
                   key={card.id}
                   data-drag-root
-                  data-card-front={card.front}
+                  data-card-front={htmlToText(card.front)}
                   className={[
                     'deck-row',
                     'sortable',
@@ -519,7 +521,7 @@ export function ManagePage() {
                   onDragEnd={clearDrag}
                 >
                   <DragHandle
-                    label={`Reorder card ${card.front}`}
+                    label={`Reorder card ${htmlToText(card.front)}`}
                     onDragStart={(e) => startDrag(e, { kind: 'card', id: card.id })}
                     onDragEnd={clearDrag}
                     onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeCard(card.id, delta))}
@@ -527,11 +529,11 @@ export function ManagePage() {
                   <span style={{ color: 'var(--text-3)', fontWeight: 700, minWidth: 26 }}>{i + 1}</span>
                   <div className="deck-row-body">
                     <div className="deck-row-name" style={{ fontSize: 14 }}>
-                      {card.front}
+                      {htmlToText(card.front)}
                     </div>
                     <div className="deck-row-meta">
-                      {card.back.slice(0, 110)}
-                      {card.back.length > 110 ? '…' : ''}
+                      {htmlToText(card.back).slice(0, 110)}
+                      {htmlToText(card.back).length > 110 ? '…' : ''}
                     </div>
                   </div>
                   <div className="row" style={{ gap: 6 }}>
@@ -541,10 +543,14 @@ export function ManagePage() {
                       onClick={() =>
                         setCardDraft({
                           id: card.id,
-                          front: card.front,
-                          back: card.back,
-                          bullets: card.bullets.join('\n'),
-                          notes: card.notes ?? '',
+                          front: toHtml(card.front),
+                          // Bullets are no longer edited separately; fold any into the back.
+                          back: card.bullets.length
+                            ? `${toHtml(card.back)}<ul>${card.bullets
+                                .map((b) => `<li>${b.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`)
+                                .join('')}</ul>`
+                            : toHtml(card.back),
+                          hadBullets: card.bullets.length > 0,
                         })
                       }
                     >
@@ -556,7 +562,7 @@ export function ManagePage() {
                       onClick={() =>
                         setConfirm({
                           title: 'Delete this card?',
-                          description: card.front,
+                          description: htmlToText(card.front),
                           run: async () => {
                             await api.deleteCard(card.id);
                             await refreshOpenDeck(openDeck.deck.id);
@@ -665,17 +671,13 @@ export function ManagePage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={busy || !cardDraft.front.trim() || !cardDraft.back.trim()}
+                disabled={busy || !hasContent(cardDraft.front) || !hasContent(cardDraft.back)}
                 onClick={() =>
                   void run(async () => {
                     const payload = {
-                      front: cardDraft.front,
-                      back: cardDraft.back,
-                      notes: cardDraft.notes || null,
-                      bullets: cardDraft.bullets
-                        .split('\n')
-                        .map((b) => b.trim())
-                        .filter(Boolean),
+                      front: sanitizeHtml(cardDraft.front),
+                      back: sanitizeHtml(cardDraft.back),
+                      ...(cardDraft.hadBullets ? { bullets: [] } : {}),
                     };
                     if (cardDraft.id) await api.updateCard(cardDraft.id, payload);
                     else await api.createCard(openDeck.deck.id, payload);
@@ -690,45 +692,25 @@ export function ManagePage() {
           }
         >
           <div className="stack">
-            <label className="field">
+            <div className="field">
               <span className="field-label">Front — the question</span>
-              <textarea
-                className="textarea"
-                style={{ minHeight: 68 }}
+              <RichTextEditor
+                label="Front — the question"
                 value={cardDraft.front}
                 autoFocus
                 placeholder="What is boundary value analysis?"
-                onChange={(e) => setCardDraft({ ...cardDraft, front: e.target.value })}
+                onChange={(front) => setCardDraft((d) => (d ? { ...d, front } : d))}
               />
-            </label>
-            <label className="field">
+            </div>
+            <div className="field">
               <span className="field-label">Back — the answer</span>
-              <textarea
-                className="textarea"
+              <RichTextEditor
+                label="Back — the answer"
                 value={cardDraft.back}
                 placeholder="Testing at the edges of each equivalence partition…"
-                onChange={(e) => setCardDraft({ ...cardDraft, back: e.target.value })}
+                onChange={(back) => setCardDraft((d) => (d ? { ...d, back } : d))}
               />
-            </label>
-            <label className="field">
-              <span className="field-label">Bullet points (one per line)</span>
-              <textarea
-                className="textarea"
-                style={{ minHeight: 76 }}
-                value={cardDraft.bullets}
-                placeholder={'Test just below the boundary\nTest on the boundary\nTest just above'}
-                onChange={(e) => setCardDraft({ ...cardDraft, bullets: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              <span className="field-label">Speaker notes (optional)</span>
-              <textarea
-                className="textarea"
-                style={{ minHeight: 60 }}
-                value={cardDraft.notes}
-                onChange={(e) => setCardDraft({ ...cardDraft, notes: e.target.value })}
-              />
-            </label>
+            </div>
           </div>
         </Modal>
       )}

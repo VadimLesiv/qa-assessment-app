@@ -1688,3 +1688,144 @@ button {
   color: var(--sea-ink);
   font-variant-numeric: tabular-nums;
 }
+
+/* ========================================================================== */
+/* Rich text (card editor + rendered cards)                                   */
+/* ========================================================================== */
+
+.rich-content ul,
+.rich-content ol {
+  margin: 6px 0;
+  padding-left: 24px;
+}
+
+.rich-content ul {
+  list-style: disc;
+}
+
+.rich-content ol {
+  list-style: decimal;
+}
+
+.rich-content pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(18, 51, 61, 0.09);
+  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.flashcard-face--back .rich-content pre {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.rich-content a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.rich-content img {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  margin: 8px 0;
+  border-radius: 8px;
+}
+
+.rte {
+  border: 1px solid var(--surface-border-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  transition: border-color 0.16s, box-shadow 0.16s;
+}
+
+.rte:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--bg-2);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.rte-tool-wrap {
+  display: inline-flex;
+}
+
+.rte-tool {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rte-tool:hover:not(:disabled) {
+  background: var(--bg-3);
+}
+
+.rte-tool--active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.rte-tool:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rte-color-glyph {
+  font-weight: 800;
+  border-bottom: 3px solid var(--rose);
+  line-height: 1;
+}
+
+.rte-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--surface-border-strong);
+}
+
+.rte-hidden-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Grows with its text; no fixed height. */
+.rte-editor {
+  min-height: 1.55em;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-1);
+  outline: none;
+  overflow-wrap: anywhere;
+}
+
+.rte-editor[data-empty='true']::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  pointer-events: none;
+}

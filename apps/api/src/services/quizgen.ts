@@ -11,7 +11,15 @@ export interface GeneratedQuestion {
 
 /** Trims an answer to a length that reads well as a multiple-choice option. */
 function condense(text: string, max = 160): string {
-  const oneLine = text.replace(/\s+/g, ' ').trim();
+  // Card text may carry rich-text markup; quiz options must be plain text.
+  const oneLine = text
+    .replace(/<\/(p|div|li|pre)>|<br\s*\/?>/gi, ' ')
+    .replace(/<\/?[a-z][^>]*>/gi, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (oneLine.length <= max) return oneLine;
   return `${oneLine.slice(0, max - 1).trimEnd()}…`;
 }

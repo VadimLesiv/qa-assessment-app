@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RichText } from '../components/RichText';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import type { Card, CardStatus, ProgressSummary, SubSection } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
@@ -195,7 +196,7 @@ export function StudyPage() {
               <span>{deck.name}</span>
               {current.sourceSlide && <span>· Slide {current.sourceSlide}</span>}
             </div>
-            <h2 className="flashcard-title">{current.front}</h2>
+            <RichText as="h2" className="flashcard-title" html={current.front} />
             <div className="flashcard-hint">
               <span aria-hidden="true">↻</span> Click or press Space to reveal
             </div>
@@ -205,7 +206,7 @@ export function StudyPage() {
             <div className="flashcard-kicker">
               <span>Answer</span>
             </div>
-            <p className="flashcard-body">{current.back}</p>
+            <RichText className="flashcard-body" html={current.back} />
 
             {current.bullets.length > 0 && (
               <ul className="flashcard-bullets">
