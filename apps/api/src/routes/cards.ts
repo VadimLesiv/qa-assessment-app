@@ -13,8 +13,8 @@ export const cardsRouter = Router();
 
 const updateSchema = z
   .object({
-    front: z.string().trim().min(1).max(500).optional(),
-    back: z.string().trim().min(1).max(5000).optional(),
+    front: z.string().trim().min(1).max(20000).optional(),
+    back: z.string().trim().min(1).max(300000).optional(),
     notes: z.string().trim().max(5000).nullish(),
     bullets: z.array(z.string().trim().max(500)).max(20).optional(),
     order: z.number().int().min(0).optional(),
