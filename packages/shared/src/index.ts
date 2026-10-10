@@ -5,8 +5,33 @@
  * shape breaks the build on both sides instead of at runtime in the browser.
  */
 
-/** The two top-level tracks the assessment is split into. */
-export type SectionTrack = 'PROCESS' | 'TECHNICAL';
+/**
+ * Key of the track a section belongs to. 'PROCESS' and 'TECHNICAL' are built in;
+ * managers can create more, so this is an open string matching `Track.key`.
+ */
+export type SectionTrack = string;
+
+/** A top-level grouping of sections on the dashboard and the Manage page. */
+export interface Track {
+  id: string;
+  /** Stable identifier stored on each section, e.g. "PROCESS". */
+  key: string;
+  name: string;
+  blurb: string | null;
+  icon: string | null;
+  /** Hex colour for the track's pill and progress ring. */
+  color: string | null;
+  order: number;
+}
+
+export interface CreateTrackInput {
+  name: string;
+  blurb?: string | null;
+  icon?: string | null;
+  color?: string | null;
+}
+
+export type UpdateTrackInput = Partial<CreateTrackInput>;
 
 /** How well the learner knows a given card. Drives the progress rings. */
 export type CardStatus = 'NEW' | 'LEARNING' | 'KNOWN';

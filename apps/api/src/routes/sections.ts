@@ -6,10 +6,12 @@ import { serializeSection, serializeSubSection, slugify } from '../lib/serialize
 import { combine, summarize } from '../lib/progress.js';
 import { statusMap, statusesFor } from '../lib/progressQuery.js';
 import { resolvePlayerId } from '../lib/player.js';
+import { assertTrackExists } from '../lib/tracks.js';
 
 export const sectionsRouter = Router();
 
-const trackSchema = z.enum(['PROCESS', 'TECHNICAL']);
+// Tracks are managed data, so existence is checked against the database in the handlers.
+const trackSchema = z.string().trim().min(1, 'Track is required').max(60);
 
 const createSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(120),
@@ -133,6 +135,7 @@ sectionsRouter.post(
   '/',
   asyncHandler(async (req, res) => {
     const input = createSchema.parse(req.body);
+    await assertTrackExists(input.track);
     const last = await prisma.section.findFirst({
       where: { track: input.track },
       orderBy: { order: 'desc' },
@@ -185,6 +188,7 @@ sectionsRouter.put(
     const input = updateSchema.parse(req.body);
     const existing = await prisma.section.findUnique({ where: { id: req.params.id } });
     if (!existing) throw HttpError.notFound('Section');
+    if (input.track !== undefined) await assertTrackExists(input.track);
 
     const section = await prisma.section.update({
       where: { id: existing.id },

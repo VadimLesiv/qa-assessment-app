@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import type { Section } from '@qa/shared';
+import type { Card, Section, Track } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
-import { plural } from '../lib/format';
+import { plural, trackPillStyle } from '../lib/format';
+import { htmlToText } from '../lib/richtext';
 import { ProgressRing } from '../components/ProgressRing';
 import { Empty, ErrorBanner, Loading } from '../components/States';
 
 export function SectionPage() {
   const { sectionId } = useParams<{ sectionId: string }>();
   const [section, setSection] = useState<Section | null>(null);
+  const [track, setTrack] = useState<Track | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Decks whose card list is expanded, and the cards loaded for them. */
+  const [openDecks, setOpenDecks] = useState<Record<string, Card[] | 'loading'>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,8 +22,10 @@ export function SectionPage() {
 
     void (async () => {
       try {
-        const data = await api.getSection(sectionId);
-        if (!cancelled) setSection(data);
+        const [data, tracks] = await Promise.all([api.getSection(sectionId), api.listTracks()]);
+        if (cancelled) return;
+        setSection(data);
+        setTrack(tracks.find((t) => t.key === data.track) ?? null);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof ApiRequestError ? err.message : 'Could not load this section');
@@ -45,6 +51,21 @@ export function SectionPage() {
 
   if (!section) return <Loading label="Opening section…" />;
 
+  const toggleCards = async (deckId: string) => {
+    if (openDecks[deckId]) {
+      setOpenDecks((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== deckId)));
+      return;
+    }
+    setOpenDecks((prev) => ({ ...prev, [deckId]: 'loading' }));
+    try {
+      const deck = await api.getSubSection(deckId);
+      setOpenDecks((prev) => ({ ...prev, [deckId]: deck.cards }));
+    } catch (err) {
+      setOpenDecks((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => id !== deckId)));
+      setError(err instanceof ApiRequestError ? err.message : 'Could not load the cards');
+    }
+  };
+
   const decks = section.subSections ?? [];
 
   return (
@@ -61,7 +82,9 @@ export function SectionPage() {
           <div>
             <div className="row" style={{ gap: 10 }}>
               <h1 className="page-title">{section.name}</h1>
-              <span className={`pill pill--${section.track.toLowerCase()}`}>{section.track}</span>
+              <span className="pill" style={trackPillStyle(track?.color)}>
+                {track?.name ?? section.track}
+              </span>
             </div>
             {section.description && <p className="page-subtitle">{section.description}</p>}
           </div>
@@ -87,9 +110,11 @@ export function SectionPage() {
           {decks.map((deck) => {
             const cardCount = deck.cardCount ?? 0;
             const quizCount = deck.quizQuestionCount ?? 0;
+            const open = openDecks[deck.id];
 
             return (
-              <div key={deck.id} className="deck-row">
+              <div key={deck.id} className="deck-block">
+              <div className="deck-row">
                 <ProgressRing
                   percent={deck.progress?.percent ?? 0}
                   size={52}
@@ -109,6 +134,15 @@ export function SectionPage() {
                 </div>
 
                 <div className="row" style={{ gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => void toggleCards(deck.id)}
+                    disabled={cardCount === 0}
+                    aria-expanded={Boolean(open)}
+                  >
+                    {open ? 'Hide cards' : '📋 Cards'}
+                  </button>
                   <button
                     type="button"
                     className="btn btn--primary btn--sm"
@@ -131,6 +165,27 @@ export function SectionPage() {
                     🎯 Quiz
                   </button>
                 </div>
+              </div>
+
+              {open === 'loading' && <p className="field-hint deck-cards">Loading cards…</p>}
+              {Array.isArray(open) && (
+                <ol className="deck-cards" aria-label={`Cards in ${deck.name}`}>
+                  {open.map((card, i) => (
+                    <li key={card.id} className="deck-card-item">
+                      <span className="deck-card-num">{i + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="deck-row-name" style={{ fontSize: 14 }}>
+                          {htmlToText(card.front)}
+                        </div>
+                        <div className="deck-row-meta">{htmlToText(card.back)}</div>
+                      </div>
+                      <span className={`pill pill--${(card.status ?? 'NEW').toLowerCase()}`}>
+                        {card.status ?? 'NEW'}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
               </div>
             );
           })}

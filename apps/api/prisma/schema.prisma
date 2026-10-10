@@ -13,12 +13,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Track {
+  id        String   @id @default(cuid())
+  /// Stable identifier stored in Section.track, e.g. "PROCESS".
+  key       String   @unique
+  name      String
+  blurb     String?
+  icon      String?
+  color     String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Section {
   id          String   @id @default(cuid())
   name        String
   slug        String   @unique
   description String?
-  /// "PROCESS" | "TECHNICAL"
+  /// Track.key, e.g. "PROCESS" | "TECHNICAL" or a manager-created track.
   track       String
   icon        String?
   accent      String?

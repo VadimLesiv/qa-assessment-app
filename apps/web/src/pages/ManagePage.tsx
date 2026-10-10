@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DragEvent, KeyboardEvent } from 'react';
-import type { Card, ImportPreview, Section, SectionTrack, SubSection } from '@qa/shared';
+import type { Card, ImportPreview, Section, SectionTrack, SubSection, Track } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
-import { plural } from '../lib/format';
+import { plural, trackPillStyle } from '../lib/format';
 import { moveCard, moveDeck, moveSection } from '../lib/reorder';
 import { ConfirmDialog, Modal } from '../components/Modal';
 import { Empty, ErrorBanner, Loading } from '../components/States';
@@ -12,26 +12,29 @@ import { useCelebration } from '../components/Celebration';
 import { useToast } from '../components/Toast';
 
 type SectionDraft = { id?: string; name: string; track: SectionTrack; description: string; icon: string; accent: string };
+type TrackDraft = { id?: string; name: string; blurb: string; icon: string; color: string };
 type DeckDraft = { id?: string; sectionId: string; name: string; description: string };
 type CardDraft = { id?: string; front: string; back: string; hadBullets?: boolean };
 
 /** What the user picked up. Decks remember their origin so a move can be named. */
 type Drag =
-  | { kind: 'section'; id: string }
+  | { kind: 'section'; id: string; track: SectionTrack }
   | { kind: 'deck'; id: string; sectionId: string }
   | { kind: 'card'; id: string };
 
 /** Where it would land: an insertion slot in the section list or in a deck list. */
 type DropHint =
-  | { kind: 'section'; index: number }
+  | { kind: 'section'; track: SectionTrack; index: number }
   | { kind: 'deck'; sectionId: string; index: number };
 
 const ACCENTS = ['#2f8fa5', '#4fc3b0', '#f08a7a', '#e0a526', '#6aa8d8', '#9b8bd6', '#5bb98c'];
 const ICONS = ['📘', '🧭', '📋', '🔄', '🎯', '🤖', '🔌', '🧪', '🧠', '🚀', '🛡️', '⚙️'];
 
-const emptySection = (): SectionDraft => ({
+const emptyTrack = (): TrackDraft => ({ name: '', blurb: '', icon: '📚', color: '#2f8fa5' });
+
+const emptySection = (track: SectionTrack = 'PROCESS'): SectionDraft => ({
   name: '',
-  track: 'PROCESS',
+  track,
   description: '',
   icon: '📘',
   accent: '#2f8fa5',
@@ -39,6 +42,8 @@ const emptySection = (): SectionDraft => ({
 
 export function ManagePage() {
   const [sections, setSections] = useState<Section[] | null>(null);
+  const [tracks, setTracks] = useState<Track[]>([]);
+  const [trackDraft, setTrackDraft] = useState<TrackDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,7 +65,9 @@ export function ManagePage() {
 
   const reload = useCallback(async () => {
     try {
-      setSections(await api.listSections());
+      const [sectionsData, tracksData] = await Promise.all([api.listSections(), api.listTracks()]);
+      setSections(sectionsData);
+      setTracks(tracksData);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : 'Could not load the curriculum');
     }
@@ -115,10 +122,15 @@ export function ManagePage() {
     }
   };
 
-  const applySectionMove = (sectionId: string, insertAt: number) => {
+  /** Sections only reorder within their own track, so indexes are per-track. */
+  const sectionsOf = (trackKey: SectionTrack) => (sections ?? []).filter((s) => s.track === trackKey);
+
+  const applySectionMove = (sectionId: string, trackKey: SectionTrack, insertAt: number) => {
     if (!sections) return;
-    const move = moveSection(sections, sectionId, insertAt);
-    if (move) void commitOrder(move.sections, () => api.reorderSections(move.ids), 'Section order saved');
+    const move = moveSection(sectionsOf(trackKey), sectionId, insertAt);
+    if (!move) return;
+    const others = sections.filter((s) => s.track !== trackKey);
+    void commitOrder([...others, ...move.sections], () => api.reorderSections(move.ids), 'Section order saved');
   };
 
   const applyDeckMove = (deckId: string, fromSectionId: string, toSectionId: string, insertAt: number) => {
@@ -188,9 +200,12 @@ export function ManagePage() {
   /** Anywhere on a section: reorders sections, or appends a dragged deck to it. */
   const onSectionDragOver = (event: DragEvent<HTMLElement>, section: Section, index: number) => {
     if (!drag || drag.kind === 'card') return;
+    if (drag.kind === 'section' && drag.track !== section.track) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    if (drag.kind === 'section') setHint({ kind: 'section', index: insertIndexFor(event, index) });
+    if (drag.kind === 'section') {
+      setHint({ kind: 'section', track: section.track, index: insertIndexFor(event, index) });
+    }
     else setHint({ kind: 'deck', sectionId: section.id, index: (section.subSections ?? []).length });
   };
 
@@ -205,7 +220,7 @@ export function ManagePage() {
 
   const onDrop = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
-    if (drag?.kind === 'section' && hint?.kind === 'section') applySectionMove(drag.id, hint.index);
+    if (drag?.kind === 'section' && hint?.kind === 'section') applySectionMove(drag.id, drag.track, hint.index);
     else if (drag?.kind === 'deck' && hint?.kind === 'deck') {
       applyDeckMove(drag.id, drag.sectionId, hint.sectionId, hint.index);
     }
@@ -216,18 +231,21 @@ export function ManagePage() {
    * Keyboard equivalent of a drag. Insertion slots sit between items, so moving
    * down one place means inserting two slots along.
    */
-  const nudgeSection = (sectionId: string, delta: -1 | 1) => {
-    if (!sections) return;
-    const from = sections.findIndex((s) => s.id === sectionId);
-    if (from + delta < 0 || from + delta >= sections.length) return;
-    applySectionMove(sectionId, delta === -1 ? from - 1 : from + 2);
+  const nudgeSection = (sectionId: string, trackKey: SectionTrack, delta: -1 | 1) => {
+    const list = sectionsOf(trackKey);
+    const from = list.findIndex((s) => s.id === sectionId);
+    if (from + delta < 0 || from + delta >= list.length) return;
+    applySectionMove(sectionId, trackKey, delta === -1 ? from - 1 : from + 2);
   };
 
   /** Past either end of its own section, a deck spills into the neighbouring one. */
   const nudgeDeck = (deckId: string, sectionId: string, delta: -1 | 1) => {
     if (!sections) return;
-    const sectionIndex = sections.findIndex((s) => s.id === sectionId);
-    const decks = sections[sectionIndex]?.subSections ?? [];
+    const current = sections.find((s) => s.id === sectionId);
+    if (!current) return;
+    const siblings = sectionsOf(current.track);
+    const sectionIndex = siblings.findIndex((s) => s.id === sectionId);
+    const decks = current.subSections ?? [];
     const from = decks.findIndex((d) => d.id === deckId);
     const to = from + delta;
 
@@ -236,7 +254,7 @@ export function ManagePage() {
       return;
     }
 
-    const neighbour = sections[sectionIndex + delta];
+    const neighbour = siblings[sectionIndex + delta];
     if (!neighbour) return;
     applyDeckMove(deckId, sectionId, neighbour.id, delta === -1 ? (neighbour.subSections ?? []).length : 0);
   };
@@ -268,14 +286,23 @@ export function ManagePage() {
             reorder sections and decks, or to move a deck into another section.
           </p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={() => setSectionDraft(emptySection())}>
-          ＋ New section
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="button" className="btn" onClick={() => setTrackDraft(emptyTrack())}>
+            ＋ New track
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => setSectionDraft(emptySection(tracks[0]?.key))}
+          >
+            ＋ New section
+          </button>
+        </div>
       </div>
 
       {sections.length === 0 ? (
         <Empty icon="📚" title="No sections yet">
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => setSectionDraft(emptySection())}>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => setSectionDraft(emptySection(tracks[0]?.key))}>
             Create your first section
           </button>
         </Empty>
@@ -288,172 +315,147 @@ export function ManagePage() {
           onDragOver={(e) => drag && drag.kind !== 'card' && e.preventDefault()}
           onDrop={onDrop}
         >
-          {sections.map((section, sectionIndex) => (
-            <div
-              key={section.id}
-              data-drag-root
-              data-section-name={section.name}
-              className={[
-                'panel',
-                'sortable',
-                drag?.kind === 'section' && drag.id === section.id ? 'is-dragging' : '',
-                hint?.kind === 'section' && hint.index === sectionIndex ? 'is-drop-before' : '',
-                hint?.kind === 'section' && hint.index === sections.length && sectionIndex === sections.length - 1
-                  ? 'is-drop-after'
-                  : '',
-                hint?.kind === 'deck' && hint.sectionId === section.id ? 'is-drop-into' : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onDragOver={(e) => onSectionDragOver(e, section, sectionIndex)}
-              onDragEnd={clearDrag}
-            >
-              <div className="row" style={{ alignItems: 'flex-start' }}>
-                <DragHandle
-                  label={`Reorder section ${section.name}`}
-                  onDragStart={(e) => startDrag(e, { kind: 'section', id: section.id })}
-                  onDragEnd={clearDrag}
-                  onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeSection(section.id, delta))}
-                />
-                <span className="tile-icon" aria-hidden="true">
-                  {section.icon ?? '📘'}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="row" style={{ gap: 9 }}>
-                    <span style={{ fontWeight: 800, fontSize: 17 }}>{section.name}</span>
-                    <span className={`pill pill--${section.track.toLowerCase()}`}>{section.track}</span>
-                  </div>
-                  {section.description && <div className="tile-desc">{section.description}</div>}
-                </div>
-
-                <div className="row" style={{ gap: 7 }}>
+          {tracks.map((track) => {
+            const trackSections = sectionsOf(track.key);
+            return (
+              <section
+                key={track.key}
+                className="track-band"
+                data-track={track.key}
+                style={{ '--track-color': track.color ?? 'var(--accent)' } as React.CSSProperties}
+              >
+                <div className="track-band-head">
+                  <span aria-hidden="true">{track.icon ?? '📚'}</span>
+                  <h2 className="track-band-title">{track.name}</h2>
+                  <span className="pill" style={trackPillStyle(track.color)}>
+                    {plural(trackSections.length, 'section')}
+                  </span>
+                  <span className="spacer" />
                   <button
                     type="button"
                     className="btn btn--sm"
-                    onClick={() =>
-                      setSectionDraft({
-                        id: section.id,
-                        name: section.name,
-                        track: section.track,
-                        description: section.description ?? '',
-                        icon: section.icon ?? '📘',
-                        accent: section.accent ?? '#2f8fa5',
-                      })
-                    }
+                    onClick={() => setSectionDraft(emptySection(track.key))}
                   >
-                    ✎ Rename
+                    ＋ Section
                   </button>
                   <button
                     type="button"
                     className="btn btn--sm"
-                    onClick={() => setDeckDraft({ sectionId: section.id, name: '', description: '' })}
-                  >
-                    ＋ Deck
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn--danger btn--sm"
+                    aria-label={`Edit track ${track.name}`}
                     onClick={() =>
-                      setConfirm({
-                        title: `Delete "${section.name}"?`,
-                        description: `This permanently removes the section, its ${section.subSections?.length ?? 0} deck(s), every card inside them, and all related progress. This cannot be undone.`,
-                        run: async () => {
-                          await api.deleteSection(section.id);
-                          if (openDeck && section.subSections?.some((s) => s.id === openDeck.deck.id)) {
-                            setOpenDeck(null);
-                          }
-                        },
+                      setTrackDraft({
+                        id: track.id,
+                        name: track.name,
+                        blurb: track.blurb ?? '',
+                        icon: track.icon ?? '📚',
+                        color: track.color ?? '#2f8fa5',
                       })
                     }
                   >
-                    🗑
+                    ✎ Track
                   </button>
+                  {trackSections.length === 0 && (
+                    <button
+                      type="button"
+                      className="btn btn--danger btn--sm"
+                      aria-label={`Delete track ${track.name}`}
+                      onClick={() =>
+                        setConfirm({
+                          title: `Delete the "${track.name}" track?`,
+                          description: 'The track is empty, so no sections are affected.',
+                          run: () => api.deleteTrack(track.id),
+                        })
+                      }
+                    >
+                      🗑
+                    </button>
+                  )}
                 </div>
-              </div>
 
-              <div className="stack" style={{ marginTop: 16, gap: 9 }}>
-                {(section.subSections ?? []).length === 0 ? (
-                  <p className="field-hint">No decks in this section yet — drop one here to move it in.</p>
+                {trackSections.length === 0 ? (
+                  <p className="field-hint">No sections in this track yet.</p>
                 ) : (
-                  section.subSections!.map((deck, deckIndex) => (
-                    <div
-                      key={deck.id}
-                      data-drag-root
-                      data-deck-name={deck.name}
-                      className={[
-                        'deck-row',
-                        'sortable',
-                        drag?.kind === 'deck' && drag.id === deck.id ? 'is-dragging' : '',
-                        hint?.kind === 'deck' && hint.sectionId === section.id && hint.index === deckIndex
+                  trackSections.map((section, sectionIndex) => (
+                  <div
+                    key={section.id}
+                    data-drag-root
+                    data-section-name={section.name}
+                    className={[
+                      'panel',
+                      'sortable',
+                      drag?.kind === 'section' && drag.id === section.id ? 'is-dragging' : '',
+                      hint?.kind === 'section' && hint.track === section.track && hint.index === sectionIndex
                           ? 'is-drop-before'
                           : '',
-                        hint?.kind === 'deck' &&
-                        hint.sectionId === section.id &&
-                        hint.index === section.subSections!.length &&
-                        deckIndex === section.subSections!.length - 1
-                          ? 'is-drop-after'
-                          : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      style={{ padding: '12px 15px' }}
-                      onDragOver={(e) => onDeckDragOver(e, section.id, deckIndex)}
-                      onDragEnd={clearDrag}
-                    >
+                      hint?.kind === 'section' &&
+                        hint.track === section.track &&
+                        hint.index === trackSections.length &&
+                        sectionIndex === trackSections.length - 1
+                        ? 'is-drop-after'
+                        : '',
+                      hint?.kind === 'deck' && hint.sectionId === section.id ? 'is-drop-into' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onDragOver={(e) => onSectionDragOver(e, section, sectionIndex)}
+                    onDragEnd={clearDrag}
+                  >
+                    <div className="row" style={{ alignItems: 'flex-start' }}>
                       <DragHandle
-                        label={`Reorder deck ${deck.name}`}
-                        onDragStart={(e) => startDrag(e, { kind: 'deck', id: deck.id, sectionId: section.id })}
+                        label={`Reorder section ${section.name}`}
+                        onDragStart={(e) => startDrag(e, { kind: 'section', id: section.id, track: section.track })}
                         onDragEnd={clearDrag}
-                        onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeDeck(deck.id, section.id, delta))}
+                        onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeSection(section.id, section.track, delta))}
                       />
-                      <div className="deck-row-body">
-                        <div className="deck-row-name" style={{ fontSize: 15 }}>
-                          {deck.name}
+                      <span className="tile-icon" aria-hidden="true">
+                        {section.icon ?? '📘'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="row" style={{ gap: 9 }}>
+                          <span style={{ fontWeight: 800, fontSize: 17 }}>{section.name}</span>
+                          <span className="pill" style={trackPillStyle(track.color)}>
+                              {track.name}
+                            </span>
                         </div>
-                        <div className="deck-row-meta">
-                          🃏 {plural(deck.cardCount ?? 0, 'card')} · 🎯{' '}
-                          {plural(deck.quizQuestionCount ?? 0, 'question')}
-                        </div>
+                        {section.description && <div className="tile-desc">{section.description}</div>}
                       </div>
 
-                      <div className="row" style={{ gap: 6 }}>
-                        <button
-                          type="button"
-                          className="btn btn--sm"
-                          onClick={async () => {
-                            const cards = await api.listCards(deck.id);
-                            setOpenDeck({ deck, cards });
-                          }}
-                        >
-                          Cards
-                        </button>
-                        <button type="button" className="btn btn--sm" onClick={() => setImportTarget(deck)}>
-                          📥 Import
-                        </button>
+                      <div className="row" style={{ gap: 7 }}>
                         <button
                           type="button"
                           className="btn btn--sm"
                           onClick={() =>
-                            setDeckDraft({
-                              id: deck.id,
-                              sectionId: section.id,
-                              name: deck.name,
-                              description: deck.description ?? '',
+                            setSectionDraft({
+                              id: section.id,
+                              name: section.name,
+                              track: section.track,
+                              description: section.description ?? '',
+                              icon: section.icon ?? '📘',
+                              accent: section.accent ?? '#2f8fa5',
                             })
                           }
                         >
-                          ✎
+                          ✎ Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--sm"
+                          onClick={() => setDeckDraft({ sectionId: section.id, name: '', description: '' })}
+                        >
+                          ＋ Deck
                         </button>
                         <button
                           type="button"
                           className="btn btn--danger btn--sm"
                           onClick={() =>
                             setConfirm({
-                              title: `Delete "${deck.name}"?`,
-                              description: `This removes the deck and all ${deck.cardCount ?? 0} of its cards permanently.`,
+                              title: `Delete "${section.name}"?`,
+                              description: `This permanently removes the section, its ${section.subSections?.length ?? 0} deck(s), every card inside them, and all related progress. This cannot be undone.`,
                               run: async () => {
-                                await api.deleteSubSection(deck.id);
-                                if (openDeck?.deck.id === deck.id) setOpenDeck(null);
+                                await api.deleteSection(section.id);
+                                if (openDeck && section.subSections?.some((s) => s.id === openDeck.deck.id)) {
+                                  setOpenDeck(null);
+                                }
                               },
                             })
                           }
@@ -462,11 +464,107 @@ export function ManagePage() {
                         </button>
                       </div>
                     </div>
+
+                    <div className="stack" style={{ marginTop: 16, gap: 9 }}>
+                      {(section.subSections ?? []).length === 0 ? (
+                        <p className="field-hint">No decks in this section yet — drop one here to move it in.</p>
+                      ) : (
+                        section.subSections!.map((deck, deckIndex) => (
+                          <div
+                            key={deck.id}
+                            data-drag-root
+                            data-deck-name={deck.name}
+                            className={[
+                              'deck-row',
+                              'sortable',
+                              drag?.kind === 'deck' && drag.id === deck.id ? 'is-dragging' : '',
+                              hint?.kind === 'deck' && hint.sectionId === section.id && hint.index === deckIndex
+                                ? 'is-drop-before'
+                                : '',
+                              hint?.kind === 'deck' &&
+                              hint.sectionId === section.id &&
+                              hint.index === section.subSections!.length &&
+                              deckIndex === section.subSections!.length - 1
+                                ? 'is-drop-after'
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            style={{ padding: '12px 15px' }}
+                            onDragOver={(e) => onDeckDragOver(e, section.id, deckIndex)}
+                            onDragEnd={clearDrag}
+                          >
+                            <DragHandle
+                              label={`Reorder deck ${deck.name}`}
+                              onDragStart={(e) => startDrag(e, { kind: 'deck', id: deck.id, sectionId: section.id })}
+                              onDragEnd={clearDrag}
+                              onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeDeck(deck.id, section.id, delta))}
+                            />
+                            <div className="deck-row-body">
+                              <div className="deck-row-name" style={{ fontSize: 15 }}>
+                                {deck.name}
+                              </div>
+                              <div className="deck-row-meta">
+                                🃏 {plural(deck.cardCount ?? 0, 'card')} · 🎯{' '}
+                                {plural(deck.quizQuestionCount ?? 0, 'question')}
+                              </div>
+                            </div>
+
+                            <div className="row" style={{ gap: 6 }}>
+                              <button
+                                type="button"
+                                className="btn btn--sm"
+                                onClick={async () => {
+                                  const cards = await api.listCards(deck.id);
+                                  setOpenDeck({ deck, cards });
+                                }}
+                              >
+                                Cards
+                              </button>
+                              <button type="button" className="btn btn--sm" onClick={() => setImportTarget(deck)}>
+                                📥 Import
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn--sm"
+                                onClick={() =>
+                                  setDeckDraft({
+                                    id: deck.id,
+                                    sectionId: section.id,
+                                    name: deck.name,
+                                    description: deck.description ?? '',
+                                  })
+                                }
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn--danger btn--sm"
+                                onClick={() =>
+                                  setConfirm({
+                                    title: `Delete "${deck.name}"?`,
+                                    description: `This removes the deck and all ${deck.cardCount ?? 0} of its cards permanently.`,
+                                    run: async () => {
+                                      await api.deleteSubSection(deck.id);
+                                      if (openDeck?.deck.id === deck.id) setOpenDeck(null);
+                                    },
+                                  })
+                                }
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                   ))
                 )}
-              </div>
-            </div>
-          ))}
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -587,6 +685,7 @@ export function ManagePage() {
       {sectionDraft && (
         <SectionModal
           draft={sectionDraft}
+          tracks={tracks}
           busy={busy}
           onChange={setSectionDraft}
           onClose={() => setSectionDraft(null)}
@@ -603,6 +702,28 @@ export function ManagePage() {
               else await api.createSection(payload);
               setSectionDraft(null);
             }, sectionDraft.id ? 'Section updated' : 'Section created')
+          }
+        />
+      )}
+
+      {trackDraft && (
+        <TrackModal
+          draft={trackDraft}
+          busy={busy}
+          onChange={setTrackDraft}
+          onClose={() => setTrackDraft(null)}
+          onSave={() =>
+            void run(async () => {
+              const payload = {
+                name: trackDraft.name,
+                blurb: trackDraft.blurb || null,
+                icon: trackDraft.icon,
+                color: trackDraft.color,
+              };
+              if (trackDraft.id) await api.updateTrack(trackDraft.id, payload);
+              else await api.createTrack(payload);
+              setTrackDraft(null);
+            }, trackDraft.id ? 'Track updated' : 'Track created')
           }
         />
       )}
@@ -782,17 +903,124 @@ function DragHandle({
 }
 
 /* ------------------------------------------------------------------ */
-/* Section modal                                                       */
+/* Track modal                                                         */
 /* ------------------------------------------------------------------ */
 
-function SectionModal({
+function TrackModal({
   draft,
   busy,
   onChange,
   onClose,
   onSave,
 }: {
+  draft: TrackDraft;
+  busy: boolean;
+  onChange: (draft: TrackDraft) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <Modal
+      title={draft.id ? 'Edit track' : 'New track'}
+      description="Tracks group sections on the dashboard and here, alongside Process and Technical."
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn--ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn--primary" onClick={onSave} disabled={busy || !draft.name.trim()}>
+            {busy ? 'Saving…' : 'Save'}
+          </button>
+        </>
+      }
+    >
+      <div className="stack">
+        <label className="field">
+          <span className="field-label">Track name</span>
+          <input
+            className="input"
+            value={draft.name}
+            autoFocus
+            placeholder="e.g. Soft Skills"
+            onChange={(e) => onChange({ ...draft, name: e.target.value })}
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Description (optional)</span>
+          <textarea
+            className="textarea"
+            style={{ minHeight: 64 }}
+            value={draft.blurb}
+            onChange={(e) => onChange({ ...draft, blurb: e.target.value })}
+          />
+        </label>
+
+        <div className="field">
+          <span className="field-label">Icon</span>
+          <div className="row" style={{ gap: 6 }}>
+            {ICONS.map((icon) => (
+              <button
+                key={icon}
+                type="button"
+                className="btn btn--sm"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: 18,
+                  borderColor: draft.icon === icon ? 'var(--accent-bright)' : undefined,
+                }}
+                onClick={() => onChange({ ...draft, icon })}
+                aria-label={`Use icon ${icon}`}
+                aria-pressed={draft.icon === icon}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">Colour</span>
+          <div className="row" style={{ gap: 8 }}>
+            {ACCENTS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={`Use colour ${color}`}
+                aria-pressed={draft.color === color}
+                onClick={() => onChange({ ...draft, color })}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 99,
+                  background: color,
+                  border: draft.color === color ? '3px solid var(--text-1)' : '2px solid transparent',
+                  cursor: 'pointer',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Section modal                                                       */
+/* ------------------------------------------------------------------ */
+
+function SectionModal({
+  draft,
+  tracks,
+  busy,
+  onChange,
+  onClose,
+  onSave,
+}: {
   draft: SectionDraft;
+  tracks: Track[];
   busy: boolean;
   onChange: (draft: SectionDraft) => void;
   onClose: () => void;
@@ -801,7 +1029,7 @@ function SectionModal({
   return (
     <Modal
       title={draft.id ? 'Edit section' : 'New section'}
-      description="Sections are the top level of the curriculum and belong to either the Process or Technical track."
+      description="Sections are the top level of the curriculum. Each one belongs to a track."
       onClose={onClose}
       footer={
         <>
@@ -833,8 +1061,11 @@ function SectionModal({
             value={draft.track}
             onChange={(e) => onChange({ ...draft, track: e.target.value as SectionTrack })}
           >
-            <option value="PROCESS">Process</option>
-            <option value="TECHNICAL">Technical</option>
+            {tracks.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.name}
+              </option>
+            ))}
           </select>
         </label>
 

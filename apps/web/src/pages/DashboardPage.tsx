@@ -1,32 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { ProgressSummary, Section, SectionTrack } from '@qa/shared';
+import type { ProgressSummary, Section, Track } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
-import { plural } from '../lib/format';
+import { plural, trackPillStyle } from '../lib/format';
 import { ProgressRing } from '../components/ProgressRing';
 import { Empty, ErrorBanner, Loading } from '../components/States';
 
-const TRACKS: { key: SectionTrack; title: string; blurb: string; icon: string }[] = [
-  {
-    key: 'PROCESS',
-    title: 'Process',
-    blurb: 'Methodology, documentation and the way a QA team works.',
-    icon: '🧭',
-  },
-  {
-    key: 'TECHNICAL',
-    title: 'Technical',
-    blurb: 'Test design, automation, APIs and performance.',
-    icon: '⚙️',
-  },
-];
-
 export function DashboardPage() {
   const [sections, setSections] = useState<Section[] | null>(null);
+  const [tracks, setTracks] = useState<Track[] | null>(null);
   const [progress, setProgress] = useState<{
     overall: ProgressSummary;
-    process: ProgressSummary;
-    technical: ProgressSummary;
+    tracks: Record<string, ProgressSummary>;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -36,9 +21,14 @@ export function DashboardPage() {
 
     void (async () => {
       try {
-        const [sectionsData, progressData] = await Promise.all([api.listSections(), api.getProgress()]);
+        const [sectionsData, progressData, tracksData] = await Promise.all([
+          api.listSections(),
+          api.getProgress(),
+          api.listTracks(),
+        ]);
         if (cancelled) return;
         setSections(sectionsData);
+        setTracks(tracksData);
         setProgress(progressData);
       } catch (err) {
         if (cancelled) return;
@@ -59,7 +49,7 @@ export function DashboardPage() {
     );
   }
 
-  if (!sections || !progress) return <Loading label="Loading your curriculum…" />;
+  if (!sections || !progress || !tracks) return <Loading label="Loading your curriculum…" />;
 
   return (
     <main className="page">
@@ -87,20 +77,21 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {TRACKS.map((track) => {
+      {tracks.map((track) => {
         const trackSections = sections.filter((s) => s.track === track.key);
-        const summary = track.key === 'PROCESS' ? progress.process : progress.technical;
+        const summary = progress.tracks[track.key] ?? { total: 0, seen: 0, known: 0, learning: 0, percent: 0 };
+        const color = track.color ?? 'var(--accent)';
 
         return (
           <section key={track.key} style={{ marginBottom: 40 }}>
             <div className="row" style={{ marginBottom: 16 }}>
               <h2 className="track-title">
                 <span aria-hidden="true" style={{ marginRight: 8 }}>
-                  {track.icon}
+                  {track.icon ?? '📚'}
                 </span>
-                {track.title} Assessment
+                {track.name} Assessment
               </h2>
-              <span className={`pill pill--${track.key.toLowerCase()}`}>
+              <span className="pill" style={trackPillStyle(track.color)}>
                 {summary.known}/{summary.total} mastered
               </span>
               <span className="spacer" />
@@ -108,16 +99,18 @@ export function DashboardPage() {
                 percent={summary.percent}
                 size={44}
                 stroke={5}
-                color={track.key === 'PROCESS' ? 'var(--track-process)' : 'var(--track-technical)'}
-                label={`${track.title} track progress`}
+                color={color}
+                label={`${track.name} track progress`}
               />
             </div>
-            <p className="page-subtitle" style={{ marginTop: 0, marginBottom: 16 }}>
-              {track.blurb}
-            </p>
+            {track.blurb && (
+              <p className="page-subtitle" style={{ marginTop: 0, marginBottom: 16 }}>
+                {track.blurb}
+              </p>
+            )}
 
             {trackSections.length === 0 ? (
-              <Empty icon="📭" title={`No ${track.title.toLowerCase()} sections yet`}>
+              <Empty icon="📭" title={`No ${track.name.toLowerCase()} sections yet`}>
                 <Link to="/manage" className="btn btn--primary btn--sm">
                   Create one
                 </Link>

@@ -8,6 +8,7 @@ import { questionsRouter, quizRouter } from './routes/quiz.js';
 import { profileRouter } from './routes/profile.js';
 import { authRouter } from './routes/auth.js';
 import { leaderboardRouter } from './routes/leaderboard.js';
+import { tracksRouter } from './routes/tracks.js';
 
 /**
  * Built as a factory so tests can mount the app with supertest without binding
@@ -29,6 +30,7 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/tracks', tracksRouter);
   app.use('/api/leaderboard', leaderboardRouter);
   // Order matters: the nested router owns /api/sections/:id/subsections.
   app.use('/api/sections', nestedSubSectionsRouter);

@@ -42,6 +42,7 @@ async function addDeck(sectionId: string, name: string) {
 beforeEach(async () => {
   // Deleting sections cascades to decks, cards, questions and progress.
   await prisma.section.deleteMany();
+  await prisma.track.deleteMany();
   await prisma.quizAttempt.deleteMany();
   await prisma.earnedBadge.deleteMany();
   await prisma.player.deleteMany();
@@ -670,5 +671,34 @@ describe('unknown routes', () => {
   it('returns a structured 404', async () => {
     const response = await request(app).get('/api/nope').expect(404);
     expect(response.body.error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('tracks', () => {
+  it('lists the built-in Process and Technical tracks', async () => {
+    const response = await api().get('/api/tracks').expect(200);
+    const keys = response.body.data.map((t: { key: string }) => t.key);
+    expect(keys).toEqual(expect.arrayContaining(['PROCESS', 'TECHNICAL']));
+  });
+
+  it('creates a track that sections can then use, with its own progress rollup', async () => {
+    const track = await api().post('/api/tracks').send({ name: 'Soft Skills Zq', icon: '🤝' }).expect(201);
+    expect(track.body.data.key).toBe('SOFT_SKILLS_ZQ');
+
+    await api().post('/api/sections').send({ name: 'Comms', track: 'SOFT_SKILLS_ZQ' }).expect(201);
+
+    const progress = await api().get('/api/progress').expect(200);
+    expect(progress.body.data.tracks.SOFT_SKILLS_ZQ.total).toBe(0);
+
+    await api().post('/api/tracks').send({ name: 'soft skills zq' }).expect(409);
+  });
+
+  it('refuses to delete a track that still has sections, then deletes it once empty', async () => {
+    const track = await api().post('/api/tracks').send({ name: 'Temp Track Zq' }).expect(201);
+    const section = await api().post('/api/sections').send({ name: 'S', track: track.body.data.key }).expect(201);
+
+    await api().delete(`/api/tracks/${track.body.data.id}`).expect(409);
+    await api().delete(`/api/sections/${section.body.data.id}`).expect(204);
+    await api().delete(`/api/tracks/${track.body.data.id}`).expect(204);
   });
 });

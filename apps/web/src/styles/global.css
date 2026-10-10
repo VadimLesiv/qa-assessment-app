@@ -792,22 +792,18 @@ button {
   overflow-y: auto;
 }
 
-/* Front: a white card with a mint wash and a hint of sea in the corner. */
-.flashcard-face--front {
+/* Both faces: a white card with a mint wash and a hint of sea in the corner. */
+.flashcard-face--front,
+.flashcard-face--back {
   background:
     radial-gradient(circle at 12% 0%, rgba(127, 227, 211, 0.4), transparent 55%),
     radial-gradient(circle at 100% 100%, rgba(47, 143, 165, 0.14), transparent 55%),
     #fff;
 }
 
-/* Back: the mid-teal "sea" from the hero, with white type. */
+/* Back: same look as the front, just turned around. */
 .flashcard-face--back {
   transform: rotateY(180deg);
-  border-color: transparent;
-  color: #fff;
-  background:
-    radial-gradient(circle at 85% 0%, rgba(255, 255, 255, 0.28), transparent 50%),
-    linear-gradient(160deg, #20697c, #2b7f93);
 }
 
 .flashcard-kicker {
@@ -820,10 +816,6 @@ button {
   text-transform: uppercase;
   color: var(--text-3);
   margin-bottom: 22px;
-}
-
-.flashcard-face--back .flashcard-kicker {
-  color: rgba(255, 255, 255, 0.82);
 }
 
 .flashcard-title {
@@ -839,10 +831,6 @@ button {
   line-height: 1.65;
   color: var(--text-2);
   margin-top: 16px;
-}
-
-.flashcard-face--back .flashcard-body {
-  color: #fff;
 }
 
 .flashcard-bullets {
@@ -862,20 +850,12 @@ button {
   color: var(--text-1);
 }
 
-.flashcard-face--back .flashcard-bullets li {
-  color: #fff;
-}
-
 .flashcard-bullets li::before {
   content: '▸';
   position: absolute;
   left: 8px;
   color: var(--accent-bright);
   font-size: 15px;
-}
-
-.flashcard-face--back .flashcard-bullets li::before {
-  color: #aef2e6;
 }
 
 .flashcard-notes {
@@ -886,11 +866,6 @@ button {
   color: var(--text-3);
   line-height: 1.55;
   font-style: italic;
-}
-
-.flashcard-face--back .flashcard-notes {
-  border-top-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
 }
 
 .flashcard-hint {
@@ -1719,10 +1694,6 @@ button {
   overflow-x: auto;
 }
 
-.flashcard-face--back .rich-content pre {
-  background: rgba(255, 255, 255, 0.16);
-}
-
 .rich-content a {
   color: inherit;
   text-decoration: underline;
@@ -1854,4 +1825,67 @@ button {
 .rich-content ol > ul,
 .rich-content ol > ol {
   margin: 2px 0;
+}
+
+/* Expandable card list under a deck on the section page */
+.deck-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.deck-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deck-card-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--surface-border);
+}
+
+.deck-card-num {
+  min-width: 24px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.deck-card-item .deck-row-meta {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Manage page: one labelled band per track */
+.track-band {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.track-band-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--track-color, var(--surface-border));
+}
+
+.track-band-title {
+  font-size: 20px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--track-color, var(--text-1));
 }

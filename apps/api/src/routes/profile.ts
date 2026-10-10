@@ -5,6 +5,7 @@ import { asyncHandler } from '../lib/errors.js';
 import { getProfile, resolvePlayerId } from '../lib/player.js';
 import { combine, summarize } from '../lib/progress.js';
 import { statusMap, statusesFor } from '../lib/progressQuery.js';
+import { ensureDefaultTracks } from '../lib/tracks.js';
 
 export const profileRouter = Router();
 
@@ -56,11 +57,15 @@ profileRouter.get(
     const byTrack = (track: string) =>
       combine(perSection.filter((p) => p.track === track).map((p) => p.summary));
 
+    await ensureDefaultTracks();
+    const tracks = await prisma.track.findMany({ select: { key: true } });
+
     res.json({
       data: {
         overall: combine(perSection.map((p) => p.summary)),
         process: byTrack('PROCESS'),
         technical: byTrack('TECHNICAL'),
+        tracks: Object.fromEntries(tracks.map((t) => [t.key, byTrack(t.key)])),
       },
     });
   }),

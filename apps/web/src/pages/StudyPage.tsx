@@ -203,9 +203,6 @@ export function StudyPage() {
           </div>
 
           <div className="flashcard-face flashcard-face--back">
-            <div className="flashcard-kicker">
-              <span>Answer</span>
-            </div>
             <RichText className="flashcard-body" html={current.back} />
 
             {current.bullets.length > 0 && (

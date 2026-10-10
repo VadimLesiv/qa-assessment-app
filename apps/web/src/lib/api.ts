@@ -7,6 +7,7 @@ import type {
   CreateCardInput,
   CreateSectionInput,
   CreateSubSectionInput,
+  CreateTrackInput,
   ImportPreview,
   LeaderboardEntry,
   LoginInput,
@@ -21,6 +22,8 @@ import type {
   Section,
   SubSection,
   SubmitQuizInput,
+  Track,
+  UpdateTrackInput,
   UpdateCardInput,
   UpdateSectionInput,
   UpdateSubSectionInput,
@@ -97,8 +100,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 /* ------------------------------------------------------------------ */
 
 export const api = {
-  listSections: (track?: 'PROCESS' | 'TECHNICAL') =>
-    request<Section[]>(`/sections${track ? `?track=${track}` : ''}`),
+  listTracks: () => request<Track[]>('/tracks'),
+
+  createTrack: (input: CreateTrackInput) =>
+    request<Track>('/tracks', { method: 'POST', body: JSON.stringify(input) }),
+
+  updateTrack: (id: string, input: UpdateTrackInput) =>
+    request<Track>(`/tracks/${id}`, { method: 'PUT', body: JSON.stringify(input) }),
+
+  deleteTrack: (id: string) => request<void>(`/tracks/${id}`, { method: 'DELETE' }),
+
+  listSections: (track?: string) =>
+    request<Section[]>(`/sections${track ? `?track=${encodeURIComponent(track)}` : ''}`),
 
   getSection: (id: string) => request<Section>(`/sections/${id}`),
 
@@ -224,9 +237,13 @@ export const api = {
     request<PlayerProfile>('/profile', { method: 'PUT', body: JSON.stringify({ name }) }),
 
   getProgress: () =>
-    request<{ overall: ProgressSummary; process: ProgressSummary; technical: ProgressSummary }>(
-      '/progress',
-    ),
+    request<{
+      overall: ProgressSummary;
+      process: ProgressSummary;
+      technical: ProgressSummary;
+      /** Rollup for every track, keyed by Track.key. */
+      tracks: Record<string, ProgressSummary>;
+    }>('/progress'),
 
   /* ---------------------------------------------------------------- */
   /* Auth                                                              */
