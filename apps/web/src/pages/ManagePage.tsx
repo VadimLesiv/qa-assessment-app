@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import type { DragEvent, KeyboardEvent } from 'react';
 import type { Card, ImportPreview, Section, SectionTrack, SubSection, Track } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
@@ -470,92 +470,203 @@ export function ManagePage() {
                         <p className="field-hint">No decks in this section yet — drop one here to move it in.</p>
                       ) : (
                         section.subSections!.map((deck, deckIndex) => (
-                          <div
-                            key={deck.id}
-                            data-drag-root
-                            data-deck-name={deck.name}
-                            className={[
-                              'deck-row',
-                              'sortable',
-                              drag?.kind === 'deck' && drag.id === deck.id ? 'is-dragging' : '',
-                              hint?.kind === 'deck' && hint.sectionId === section.id && hint.index === deckIndex
-                                ? 'is-drop-before'
-                                : '',
-                              hint?.kind === 'deck' &&
-                              hint.sectionId === section.id &&
-                              hint.index === section.subSections!.length &&
-                              deckIndex === section.subSections!.length - 1
-                                ? 'is-drop-after'
-                                : '',
-                            ]
-                              .filter(Boolean)
-                              .join(' ')}
-                            style={{ padding: '12px 15px' }}
-                            onDragOver={(e) => onDeckDragOver(e, section.id, deckIndex)}
-                            onDragEnd={clearDrag}
-                          >
-                            <DragHandle
-                              label={`Reorder deck ${deck.name}`}
-                              onDragStart={(e) => startDrag(e, { kind: 'deck', id: deck.id, sectionId: section.id })}
+                          <Fragment key={deck.id}>
+                            <div
+                              data-drag-root
+                              data-deck-name={deck.name}
+                              className={[
+                                'deck-row',
+                                'sortable',
+                                drag?.kind === 'deck' && drag.id === deck.id ? 'is-dragging' : '',
+                                hint?.kind === 'deck' && hint.sectionId === section.id && hint.index === deckIndex
+                                  ? 'is-drop-before'
+                                  : '',
+                                hint?.kind === 'deck' &&
+                                hint.sectionId === section.id &&
+                                hint.index === section.subSections!.length &&
+                                deckIndex === section.subSections!.length - 1
+                                  ? 'is-drop-after'
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
+                              style={{ padding: '12px 15px' }}
+                              onDragOver={(e) => onDeckDragOver(e, section.id, deckIndex)}
                               onDragEnd={clearDrag}
-                              onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeDeck(deck.id, section.id, delta))}
-                            />
-                            <div className="deck-row-body">
-                              <div className="deck-row-name" style={{ fontSize: 15 }}>
-                                {deck.name}
+                            >
+                              <DragHandle
+                                label={`Reorder deck ${deck.name}`}
+                                onDragStart={(e) => startDrag(e, { kind: 'deck', id: deck.id, sectionId: section.id })}
+                                onDragEnd={clearDrag}
+                                onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeDeck(deck.id, section.id, delta))}
+                              />
+                              <div className="deck-row-body">
+                                <div className="deck-row-name" style={{ fontSize: 15 }}>
+                                  {deck.name}
+                                </div>
+                                <div className="deck-row-meta">
+                                  🃏 {plural(deck.cardCount ?? 0, 'card')} · 🎯{' '}
+                                  {plural(deck.quizQuestionCount ?? 0, 'question')}
+                                </div>
                               </div>
-                              <div className="deck-row-meta">
-                                🃏 {plural(deck.cardCount ?? 0, 'card')} · 🎯{' '}
-                                {plural(deck.quizQuestionCount ?? 0, 'question')}
-                              </div>
-                            </div>
 
-                            <div className="row" style={{ gap: 6 }}>
-                              <button
-                                type="button"
-                                className="btn btn--sm"
-                                onClick={async () => {
-                                  const cards = await api.listCards(deck.id);
-                                  setOpenDeck({ deck, cards });
-                                }}
-                              >
-                                Cards
-                              </button>
-                              <button type="button" className="btn btn--sm" onClick={() => setImportTarget(deck)}>
-                                📥 Import
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--sm"
-                                onClick={() =>
-                                  setDeckDraft({
-                                    id: deck.id,
-                                    sectionId: section.id,
-                                    name: deck.name,
-                                    description: deck.description ?? '',
-                                  })
-                                }
-                              >
-                                ✎
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--danger btn--sm"
-                                onClick={() =>
-                                  setConfirm({
-                                    title: `Delete "${deck.name}"?`,
-                                    description: `This removes the deck and all ${deck.cardCount ?? 0} of its cards permanently.`,
-                                    run: async () => {
-                                      await api.deleteSubSection(deck.id);
-                                      if (openDeck?.deck.id === deck.id) setOpenDeck(null);
-                                    },
-                                  })
-                                }
-                              >
-                                🗑
-                              </button>
+                              <div className="row" style={{ gap: 6 }}>
+                                <button
+                                  type="button"
+                                  className="btn btn--sm"
+                                  onClick={async () => {
+                                    if (openDeck?.deck.id === deck.id) {
+                                      setOpenDeck(null);
+                                      return;
+                                    }
+                                    const cards = await api.listCards(deck.id);
+                                    setOpenDeck({ deck, cards });
+                                  }}
+                                >
+                                  Cards {openDeck?.deck.id === deck.id ? '▴' : '▾'}
+                                </button>
+                                <button type="button" className="btn btn--sm" onClick={() => setImportTarget(deck)}>
+                                  📥 Import
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn--sm"
+                                  onClick={() =>
+                                    setDeckDraft({
+                                      id: deck.id,
+                                      sectionId: section.id,
+                                      name: deck.name,
+                                      description: deck.description ?? '',
+                                    })
+                                  }
+                                >
+                                  ✎
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn--danger btn--sm"
+                                  onClick={() =>
+                                    setConfirm({
+                                      title: `Delete "${deck.name}"?`,
+                                      description: `This removes the deck and all ${deck.cardCount ?? 0} of its cards permanently.`,
+                                      run: async () => {
+                                        await api.deleteSubSection(deck.id);
+                                        if (openDeck?.deck.id === deck.id) setOpenDeck(null);
+                                      },
+                                    })
+                                  }
+                                >
+                                  🗑
+                                </button>
+                              </div>
                             </div>
-                          </div>
+        {openDeck?.deck.id === deck.id && (
+          <div className="panel" style={{ marginTop: 0 }}>
+            <div className="row">
+              <h2 style={{ fontSize: 19, fontWeight: 800 }}>Cards in “{openDeck.deck.name}”</h2>
+              <span className="spacer" />
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => setCardDraft({ front: '', back: '' })}
+              >
+                ＋ Add card
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setOpenDeck(null)}>
+                ✕ Close
+              </button>
+            </div>
+  
+            {openDeck.cards.length === 0 ? (
+              <p className="field-hint" style={{ marginTop: 14 }}>
+                No cards yet — add one by hand or import a .pptx deck.
+              </p>
+            ) : (
+              <div
+                className="stack"
+                style={{ marginTop: 16, gap: 9 }}
+                // Keeps the gaps between rows droppable, as for sections and decks.
+                onDragOver={(e) => drag?.kind === 'card' && e.preventDefault()}
+                onDrop={onCardDrop}
+              >
+                {openDeck.cards.map((card, i) => (
+                  <div
+                    key={card.id}
+                    data-drag-root
+                    data-card-front={htmlToText(card.front)}
+                    className={[
+                      'deck-row',
+                      'sortable',
+                      drag?.kind === 'card' && drag.id === card.id ? 'is-dragging' : '',
+                      cardHint === i ? 'is-drop-before' : '',
+                      cardHint === openDeck.cards.length && i === openDeck.cards.length - 1 ? 'is-drop-after' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ padding: '12px 15px' }}
+                    onDragOver={(e) => onCardDragOver(e, i)}
+                    onDragEnd={clearDrag}
+                  >
+                    <DragHandle
+                      label={`Reorder card ${htmlToText(card.front)}`}
+                      onDragStart={(e) => startDrag(e, { kind: 'card', id: card.id })}
+                      onDragEnd={clearDrag}
+                      onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeCard(card.id, delta))}
+                    />
+                    <span style={{ color: 'var(--text-3)', fontWeight: 700, minWidth: 26 }}>{i + 1}</span>
+                    <div className="deck-row-body">
+                      <div className="deck-row-name" style={{ fontSize: 14 }}>
+                        {htmlToText(card.front)}
+                      </div>
+                      <div className="deck-row-meta">
+                        {htmlToText(card.back).slice(0, 110)}
+                        {htmlToText(card.back).length > 110 ? '…' : ''}
+                      </div>
+                    </div>
+                    <div className="row" style={{ gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn btn--sm"
+                        onClick={() =>
+                          setCardDraft({
+                            id: card.id,
+                            front: toHtml(card.front),
+                            // Bullets are no longer edited separately; fold any into the back.
+                            back: card.bullets.length
+                              ? `${toHtml(card.back)}<ul>${card.bullets
+                                  .map((b) => `<li>${b.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`)
+                                  .join('')}</ul>`
+                              : toHtml(card.back),
+                            hadBullets: card.bullets.length > 0,
+                          })
+                        }
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--sm"
+                        onClick={() =>
+                          setConfirm({
+                            title: 'Delete this card?',
+                            description: htmlToText(card.front),
+                            run: async () => {
+                              await api.deleteCard(card.id);
+                              await refreshOpenDeck(openDeck.deck.id);
+                            },
+                          })
+                        }
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+                          </Fragment>
                         ))
                       )}
                     </div>
@@ -568,115 +679,6 @@ export function ManagePage() {
         </div>
       )}
 
-      {/* ---------------------------------------------------------------- */}
-      {/* Card editor for the selected deck                                 */}
-      {/* ---------------------------------------------------------------- */}
-      {openDeck && (
-        <div className="panel" style={{ marginTop: 28 }}>
-          <div className="row">
-            <h2 style={{ fontSize: 19, fontWeight: 800 }}>Cards in “{openDeck.deck.name}”</h2>
-            <span className="spacer" />
-            <button
-              type="button"
-              className="btn btn--primary btn--sm"
-              onClick={() => setCardDraft({ front: '', back: '' })}
-            >
-              ＋ Add card
-            </button>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setOpenDeck(null)}>
-              ✕ Close
-            </button>
-          </div>
-
-          {openDeck.cards.length === 0 ? (
-            <p className="field-hint" style={{ marginTop: 14 }}>
-              No cards yet — add one by hand or import a .pptx deck.
-            </p>
-          ) : (
-            <div
-              className="stack"
-              style={{ marginTop: 16, gap: 9 }}
-              // Keeps the gaps between rows droppable, as for sections and decks.
-              onDragOver={(e) => drag?.kind === 'card' && e.preventDefault()}
-              onDrop={onCardDrop}
-            >
-              {openDeck.cards.map((card, i) => (
-                <div
-                  key={card.id}
-                  data-drag-root
-                  data-card-front={htmlToText(card.front)}
-                  className={[
-                    'deck-row',
-                    'sortable',
-                    drag?.kind === 'card' && drag.id === card.id ? 'is-dragging' : '',
-                    cardHint === i ? 'is-drop-before' : '',
-                    cardHint === openDeck.cards.length && i === openDeck.cards.length - 1 ? 'is-drop-after' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  style={{ padding: '12px 15px' }}
-                  onDragOver={(e) => onCardDragOver(e, i)}
-                  onDragEnd={clearDrag}
-                >
-                  <DragHandle
-                    label={`Reorder card ${htmlToText(card.front)}`}
-                    onDragStart={(e) => startDrag(e, { kind: 'card', id: card.id })}
-                    onDragEnd={clearDrag}
-                    onKeyDown={(e) => onHandleKeyDown(e, (delta) => nudgeCard(card.id, delta))}
-                  />
-                  <span style={{ color: 'var(--text-3)', fontWeight: 700, minWidth: 26 }}>{i + 1}</span>
-                  <div className="deck-row-body">
-                    <div className="deck-row-name" style={{ fontSize: 14 }}>
-                      {htmlToText(card.front)}
-                    </div>
-                    <div className="deck-row-meta">
-                      {htmlToText(card.back).slice(0, 110)}
-                      {htmlToText(card.back).length > 110 ? '…' : ''}
-                    </div>
-                  </div>
-                  <div className="row" style={{ gap: 6 }}>
-                    <button
-                      type="button"
-                      className="btn btn--sm"
-                      onClick={() =>
-                        setCardDraft({
-                          id: card.id,
-                          front: toHtml(card.front),
-                          // Bullets are no longer edited separately; fold any into the back.
-                          back: card.bullets.length
-                            ? `${toHtml(card.back)}<ul>${card.bullets
-                                .map((b) => `<li>${b.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`)
-                                .join('')}</ul>`
-                            : toHtml(card.back),
-                          hadBullets: card.bullets.length > 0,
-                        })
-                      }
-                    >
-                      ✎
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--danger btn--sm"
-                      onClick={() =>
-                        setConfirm({
-                          title: 'Delete this card?',
-                          description: htmlToText(card.front),
-                          run: async () => {
-                            await api.deleteCard(card.id);
-                            await refreshOpenDeck(openDeck.deck.id);
-                          },
-                        })
-                      }
-                    >
-                      🗑
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ---------------------------------------------------------------- */}
       {/* Modals                                                            */}
