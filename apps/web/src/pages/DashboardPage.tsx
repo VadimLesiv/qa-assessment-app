@@ -4,6 +4,7 @@ import type { ProgressSummary, Section, Track } from '@qa/shared';
 import { api, ApiRequestError } from '../lib/api';
 import { plural, trackPillStyle } from '../lib/format';
 import { ProgressRing } from '../components/ProgressRing';
+import { StudyCalendar } from '../components/StudyCalendar';
 import { Empty, ErrorBanner, Loading } from '../components/States';
 
 export function DashboardPage() {
@@ -76,6 +77,8 @@ export function DashboardPage() {
           </div>
         </div>
       </div>
+
+      <StudyCalendar />
 
       {tracks.map((track) => {
         const trackSections = sections.filter((s) => s.track === track.key);

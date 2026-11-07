@@ -804,6 +804,32 @@ button {
 /* Back: same look as the front, just turned around. */
 .flashcard-face--back {
   transform: rotateY(180deg);
+  padding: 24px 28px;
+  --text-2: #0b2e38;
+}
+
+/* Back side: slightly larger text for readability. */
+.flashcard-face--back .flashcard-body {
+  font-size: 20px;
+}
+
+/* Bold words keep the size of the text around them. */
+.flashcard-face--back .rich-content b,
+.flashcard-face--back .rich-content strong {
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.flashcard-face--back .flashcard-bullets li {
+  font-size: 18px;
+}
+
+.flashcard-face--back .flashcard-bullets li::before {
+  font-size: 18px;
+}
+
+.flashcard-face--back .flashcard-notes {
+  font-size: 15px;
 }
 
 .flashcard-kicker {
@@ -1888,4 +1914,49 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--track-color, var(--text-1));
+}
+
+/* ========================================================================== */
+/* Study calendar                                                             */
+/* ========================================================================== */
+
+.study-cal {
+  max-width: 360px;
+  margin-bottom: 36px;
+  padding: 18px;
+}
+.study-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.study-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.study-cal-dow {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  padding-bottom: 4px;
+}
+.study-cal-day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-2);
+  background: var(--bg-2);
+}
+.study-cal-day.is-studied {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.study-cal-day.is-today {
+  outline: 2px solid var(--amber);
+  outline-offset: 1px;
 }

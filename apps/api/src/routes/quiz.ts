@@ -10,7 +10,7 @@ import {
 import { prisma } from '../lib/prisma.js';
 import { HttpError, asyncHandler } from '../lib/errors.js';
 import { serializeQuestion } from '../lib/serialize.js';
-import { getProfile, grantXp, resolvePlayerId } from '../lib/player.js';
+import { getProfile, grantXp, recordStudyDay, resolvePlayerId } from '../lib/player.js';
 import { award, type BadgeCode } from '../lib/badges.js';
 import { generateFromCards } from '../services/quizgen.js';
 
@@ -182,6 +182,7 @@ quizRouter.post(
     });
 
     await grantXp(playerId, xpEarned);
+    await recordStudyDay(playerId);
 
     const profile = await getProfile(playerId);
     const codes: BadgeCode[] = ['FIRST_QUIZ'];
