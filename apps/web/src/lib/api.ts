@@ -236,6 +236,8 @@ export const api = {
   renameProfile: (name: string) =>
     request<PlayerProfile>('/profile', { method: 'PUT', body: JSON.stringify({ name }) }),
 
+  getStudyDays: () => request<string[]>('/profile/study-days'),
+
   getProgress: () =>
     request<{
       overall: ProgressSummary;

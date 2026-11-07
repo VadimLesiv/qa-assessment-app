@@ -6,7 +6,7 @@ import { HttpError, asyncHandler } from '../lib/errors.js';
 import { serializeCard } from '../lib/serialize.js';
 import { summarize } from '../lib/progress.js';
 import { statusMap, statusesFor } from '../lib/progressQuery.js';
-import { getProfile, grantXp, resolvePlayerId } from '../lib/player.js';
+import { getProfile, grantXp, recordStudyDay, resolvePlayerId } from '../lib/player.js';
 import { award, type BadgeCode } from '../lib/badges.js';
 
 export const cardsRouter = Router();
@@ -138,6 +138,8 @@ cardsRouter.put(
         lastSeenAt: new Date(),
       },
     });
+
+    await recordStudyDay(playerId);
 
     let xpEarned = 0;
     if (isFirstFlip) xpEarned += XP_PER_CARD_FLIPPED;

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
 import { asyncHandler } from '../lib/errors.js';
-import { getProfile, resolvePlayerId } from '../lib/player.js';
+import { getProfile, listStudyDays, resolvePlayerId } from '../lib/player.js';
 import { combine, summarize } from '../lib/progress.js';
 import { statusMap, statusesFor } from '../lib/progressQuery.js';
 import { ensureDefaultTracks } from '../lib/tracks.js';
@@ -97,5 +97,14 @@ profileRouter.get(
         createdAt: a.createdAt.toISOString(),
       })),
     });
+  }),
+);
+
+/** GET /api/profile/study-days - dates (YYYY-MM-DD) on which the player studied. */
+profileRouter.get(
+  '/study-days',
+  asyncHandler(async (req, res) => {
+    const playerId = await resolvePlayerId(req);
+    res.json({ data: await listStudyDays(playerId) });
   }),
 );
